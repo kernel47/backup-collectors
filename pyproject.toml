@@ -20,13 +20,13 @@ dev = ["pytest>=8.2", "ruff>=0.5"]
 backup-collector = "backup_collector.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["backup_collector*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-

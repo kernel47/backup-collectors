@@ -1,0 +1,25 @@
+from backup_collector.scopes.elk.policies import parse as parse_elk_policies
+from backup_collector.scopes.pamela.policies import parse as parse_pamela_policies
+
+
+def test_pamela_policy_parser_selects_expected_fields():
+    parsed = parse_pamela_policies(
+        [{"name": "daily", "policy_type": "Standard", "active": True, "ignored": 1}]
+    )
+    assert parsed == [
+        {
+            "master": None,
+            "policy_name": "daily",
+            "policy_type": "Standard",
+            "active": True,
+        }
+    ]
+
+
+def test_elk_policy_parser_enriches_event():
+    parsed = parse_elk_policies([{"name": "daily", "master": "master-01"}])
+    assert parsed[0]["name"] == "daily"
+    assert parsed[0]["source"] == {"type": "netbackup", "asset": "master-01"}
+    assert parsed[0]["data"] == {"type": "policies"}
+    assert "@timestamp" in parsed[0]
+

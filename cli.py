@@ -27,7 +27,11 @@ def create_parser() -> argparse.ArgumentParser:
     collect.add_argument("data_type")
     collect.add_argument("--scope", required=True)
     assets = collect.add_mutually_exclusive_group()
-    assets.add_argument("--asset")
+    assets.add_argument(
+        "--asset",
+        metavar="MASTER_SERVER",
+        help="master server hostname passed to the external source module",
+    )
     assets.add_argument("--all-assets", action="store_true")
     collect.add_argument("--start-time", type=_datetime)
     collect.add_argument("--end-time", type=_datetime)

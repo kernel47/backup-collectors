@@ -27,7 +27,7 @@ class BaselineScope:
                 findings,
                 context,
                 build_output(name, self.settings),
-                context.asset or self.settings.nbu_host,
+                context.asset,
             )
         collected_count = sum(len(records) for records in datasets.values())
         return ExecutionResult(

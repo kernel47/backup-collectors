@@ -4,8 +4,9 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 from context import CollectionContext
-from exceptions import UnsupportedCollectionError
-from runtime.executor import _netbackup_client, execute, validate_context
+from exceptions import ConfigurationError, UnsupportedCollectionError
+from external.netbackup import create_client
+from runtime.executor import execute, validate_context
 from runtime.registry import SCOPES, SOURCES
 from scopes.elk import ElkScope
 from scopes.pamela import PamelaScope
@@ -58,12 +59,11 @@ def test_nbu_package_client_is_used(monkeypatch):
     module = ModuleType("nbu")
     module.NetBackup = FakeNetBackup
     monkeypatch.setitem(sys.modules, "nbu", module)
-    settings = Settings("master-01", "user", "secret", False)
-    client = _netbackup_client(CollectionContext("netbackup", "jobs", "pamela"), settings)
+    client = create_client("master-01")
     assert isinstance(client, FakeNetBackup)
-    assert created == {
-        "master": "master-01",
-        "username": "user",
-        "password": "secret",
-        "verify_ssl": False,
-    }
+    assert created == {"master": "master-01"}
+
+
+def test_nbu_client_requires_master_server_hostname():
+    with pytest.raises(ConfigurationError, match="--asset MASTER_SERVER"):
+        create_client("")

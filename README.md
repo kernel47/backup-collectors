@@ -16,10 +16,11 @@ La séparation reste volontairement directe :
 CLI -> Source -> CollectionResult -> Scope/Parser -> Output -> ExecutionResult
 ```
 
-NetBackup passe exclusivement par le package Python `nbu`. Pamela envoie par défaut
-vers Backup Hub, ELK vers Logstash et Baseline vers le référentiel. Les destinations
-JSON et stdout permettent de tester sans appel HTTP. Data Domain et Tape Library sont
-présents comme points d'extension, sans client API dans cette version.
+NetBackup passe exclusivement par le package Python `nbu`, isolé derrière l'adaptateur
+`external/netbackup.py`. Backup Collector lui transmet uniquement le hostname du master
+server ; `netbackup-py` reste responsable de retrouver sa configuration et ses secrets.
+Pamela envoie par défaut vers Backup Hub, ELK vers Logstash et Baseline vers le
+référentiel. Les destinations JSON et stdout permettent de tester sans appel HTTP.
 
 ## Installation et configuration
 
@@ -30,33 +31,40 @@ python -m pip install -e '.[dev]'
 Variables principales :
 
 ```text
-NBU_HOST, NBU_USERNAME, NBU_PASSWORD, NBU_VERIFY_TLS
 BACKUP_HUB_URL, BACKUP_HUB_TOKEN
 LOGSTASH_URL, LOGSTASH_TOKEN
 REFERENCE_URL, REFERENCE_TOKEN
 BACKUP_COLLECTOR_OUTPUT_DIR, BACKUP_COLLECTOR_LOG_LEVEL
 ```
 
-Seules les valeurs nécessaires au pipeline sont exigées. Une sortie JSON n'exige donc
-aucune URL HTTP. `--asset` remplace `NBU_HOST` pour une exécution donnée.
+Backup Collector ne lit aucune variable de connexion NetBackup et ne stocke aucun mot
+de passe NetBackup. Le hostname du master server est fourni avec
+`--asset MASTER_SERVER`. Une sortie JSON n'exige aucune URL HTTP.
 
 ## Exemples
 
 ```bash
-backup-collector collect netbackup policies --scope pamela
+backup-collector collect netbackup policies \
+  --scope pamela \
+  --asset master-emea-01
 
 backup-collector collect netbackup jobs \
   --scope pamela \
+  --asset master-emea-01 \
   --hours 24
 
-backup-collector collect netbackup shares --scope elk
+backup-collector collect netbackup shares \
+  --scope elk \
+  --asset master-emea-01
 
 backup-collector collect netbackup images \
   --scope elk \
+  --asset master-emea-01 \
   --output json
 
 backup-collector collect netbackup baseline \
   --scope baseline \
+  --asset master-emea-01 \
   --output json
 ```
 
@@ -78,6 +86,9 @@ $BACKUP_COLLECTOR_OUTPUT_DIR/<scope>/<source>/<data_type>/
   adaptateur d'output, puis l'inscrire dans `SCOPES`.
 - **Nouvel output** : implémenter `send(records, context, metadata)`, puis l'ajouter au
   dictionnaire de `outputs/__init__.py`.
+- **Nouveau module externe** : déclarer sa dépendance dans `pyproject.toml`, puis créer
+  un adaptateur minimal dans `external/`. Les secrets restent gérés par le module
+  externe ou le référentiel, jamais par Backup Collector.
 
 Le connecteur `shares` est une adaptation temporaire documentée : le module `nbu`
 actuel ne possède pas encore de service shares, donc il expose pour l'instant les

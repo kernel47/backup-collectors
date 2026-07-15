@@ -1,7 +1,8 @@
 from typing import Any
 
 from context import CollectionContext
-from exceptions import ConfigurationError, UnsupportedCollectionError
+from exceptions import UnsupportedCollectionError
+from external.netbackup import create_client as create_netbackup_client
 from result import ExecutionResult
 from runtime.registry import SCOPES, SOURCES, SUPPORTED_COLLECTIONS
 from settings import Settings
@@ -14,20 +15,6 @@ def validate_context(context: CollectionContext) -> None:
             "Unsupported collection: "
             f"source={context.source} data_type={context.data_type} scope={context.scope}"
         )
-
-
-def _netbackup_client(context: CollectionContext, settings: Settings) -> Any:
-    settings.require_netbackup(context.asset)
-    try:
-        from nbu import NetBackup
-    except ImportError as exc:
-        raise ConfigurationError("The netbackup-py package is not installed") from exc
-    return NetBackup(
-        master=context.asset or settings.nbu_host,
-        username=settings.nbu_username,
-        password=settings.nbu_password,
-        verify_ssl=settings.nbu_verify_tls,
-    )
 
 
 def execute(
@@ -43,7 +30,7 @@ def execute(
     owns_client = source_client is None and context.source == "netbackup"
     client = source_client
     if context.source == "netbackup" and client is None:
-        client = _netbackup_client(context, settings)
+        client = create_netbackup_client(context.asset or "")
     source = source_class(client)
     scope = scope_class(settings)
     try:
@@ -51,4 +38,3 @@ def execute(
     finally:
         if owns_client and hasattr(client, "close"):
             client.close()
-

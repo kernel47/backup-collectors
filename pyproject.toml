@@ -17,11 +17,14 @@ dependencies = [
 dev = ["pytest>=8.2", "ruff>=0.5"]
 
 [project.scripts]
-backup-collector = "backup_collector.cli:main"
+backup-collector = "cli:main"
+
+[tool.setuptools]
+py-modules = ["cli", "context", "exceptions", "result", "settings"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["backup_collector*"]
+include = ["outputs*", "runtime*", "scopes*", "sources*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

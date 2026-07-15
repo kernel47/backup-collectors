@@ -1,5 +1,5 @@
-from backup_collector.scopes.elk.policies import parse as parse_elk_policies
-from backup_collector.scopes.pamela.policies import parse as parse_pamela_policies
+from scopes.elk.policies import parse as parse_elk_policies
+from scopes.pamela.policies import parse as parse_pamela_policies
 
 
 def test_pamela_policy_parser_selects_expected_fields():

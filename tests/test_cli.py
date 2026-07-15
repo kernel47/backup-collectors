@@ -1,6 +1,6 @@
-from backup_collector import cli
-from backup_collector.exceptions import ConfigurationError
-from backup_collector.result import ExecutionResult
+import cli
+from exceptions import ConfigurationError
+from result import ExecutionResult
 
 
 def test_context_is_created_from_cli_arguments():

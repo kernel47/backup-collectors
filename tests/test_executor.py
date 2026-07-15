@@ -3,14 +3,14 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from backup_collector.context import CollectionContext
-from backup_collector.exceptions import UnsupportedCollectionError
-from backup_collector.runtime.executor import _netbackup_client, execute, validate_context
-from backup_collector.runtime.registry import SCOPES, SOURCES
-from backup_collector.scopes.elk import ElkScope
-from backup_collector.scopes.pamela import PamelaScope
-from backup_collector.settings import Settings
-from backup_collector.sources.netbackup import NetBackupSource
+from context import CollectionContext
+from exceptions import UnsupportedCollectionError
+from runtime.executor import _netbackup_client, execute, validate_context
+from runtime.registry import SCOPES, SOURCES
+from scopes.elk import ElkScope
+from scopes.pamela import PamelaScope
+from settings import Settings
+from sources.netbackup import NetBackupSource
 
 
 class FakePolicies:

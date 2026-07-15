@@ -1,7 +1,7 @@
 import json
 
-from backup_collector.context import CollectionContext
-from backup_collector.outputs.json_file import JsonFileOutput
+from context import CollectionContext
+from outputs.json_file import JsonFileOutput
 
 
 def test_json_output_is_atomic_and_has_metadata(tmp_path):

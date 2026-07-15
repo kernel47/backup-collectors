@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from backup_collector.context import CollectionContext
-from backup_collector.sources.netbackup import NetBackupSource
+from context import CollectionContext
+from sources.netbackup import NetBackupSource
 
 
 class Model:

@@ -2,7 +2,7 @@ from typing import Any
 
 from context import CollectionContext
 from exceptions import UnsupportedCollectionError
-from external.netbackup import create_client as create_netbackup_client
+from modules.netbackup.client import create_client as create_netbackup_client
 from result import ExecutionResult
 from runtime.registry import SCOPES, SOURCES, SUPPORTED_COLLECTIONS
 from settings import Settings

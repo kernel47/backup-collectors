@@ -5,13 +5,13 @@ import pytest
 
 from context import CollectionContext
 from exceptions import ConfigurationError, UnsupportedCollectionError
-from external.netbackup import create_client
+from modules.netbackup.client import create_client
 from runtime.executor import execute, validate_context
 from runtime.registry import SCOPES, SOURCES
-from scopes.elk import ElkScope
+from modules.elk import ElkScope
 from scopes.pamela import PamelaScope
 from settings import Settings
-from sources.netbackup import NetBackupSource
+from modules.netbackup import NetBackupSource
 
 
 class FakePolicies:

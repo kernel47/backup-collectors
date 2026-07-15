@@ -16,13 +16,26 @@ La séparation reste volontairement directe :
 CLI -> Source -> CollectionResult -> Scope/Parser -> Output -> ExecutionResult
 ```
 
-Tout le comportement visible par Icinga est regroupé dans `icinga_handler.py` : format
-des lignes `OK/WARNING/CRITICAL/UNKNOWN`, codes de retour et configuration du logging.
-Ce fichier peut être modifié seul pour adapter l'intégration Icinga. Les transports de
-données métier (Backup Hub, Logstash, JSON, etc.) restent dans `outputs/`.
+Tout le comportement visible par Icinga est regroupé dans `modules/icinga/handler.py` :
+format des lignes `OK/WARNING/CRITICAL/UNKNOWN`, codes de retour et configuration du
+logging. Ce fichier peut être modifié seul pour adapter l'intégration Icinga.
+
+Les intégrations NetBackup, Backup Hub, Referential, Logstash, ELK et Icinga sont
+regroupées dans `modules/`. Les outputs locaux et génériques, comme JSON, stdout et le
+transport HTTP commun, restent dans `outputs/`.
+
+```text
+modules/
+├── backup_hub/
+├── elk/
+├── icinga/
+├── logstash/
+├── netbackup/
+└── referential/
+```
 
 NetBackup passe exclusivement par le package Python `nbu`, isolé derrière l'adaptateur
-`external/netbackup.py`. Backup Collector lui transmet uniquement le hostname du master
+`modules/netbackup/client.py`. Backup Collector lui transmet uniquement le hostname du master
 server ; `netbackup-py` reste responsable de retrouver sa configuration et ses secrets.
 Pamela envoie par défaut vers Backup Hub, ELK vers Logstash et Baseline vers le
 référentiel. Les destinations JSON et stdout permettent de tester sans appel HTTP.
@@ -38,7 +51,7 @@ Variables principales :
 ```text
 BACKUP_HUB_URL, BACKUP_HUB_TOKEN
 LOGSTASH_URL, LOGSTASH_TOKEN
-REFERENCE_URL, REFERENCE_TOKEN
+REFERENTIAL_URL, REFERENTIAL_TOKEN
 BACKUP_COLLECTOR_OUTPUT_DIR, BACKUP_COLLECTOR_LOG_LEVEL
 ```
 
@@ -92,7 +105,7 @@ $BACKUP_COLLECTOR_OUTPUT_DIR/<scope>/<source>/<data_type>/
 - **Nouvel output** : implémenter `send(records, context, metadata)`, puis l'ajouter au
   dictionnaire de `outputs/__init__.py`.
 - **Nouveau module externe** : déclarer sa dépendance dans `pyproject.toml`, puis créer
-  un adaptateur minimal dans `external/`. Les secrets restent gérés par le module
+  un sous-dossier et un adaptateur minimal dans `modules/`. Les secrets restent gérés par le module
   externe ou le référentiel, jamais par Backup Collector.
 
 Le connecteur `shares` est une adaptation temporaire documentée : le module `nbu`
@@ -113,7 +126,7 @@ OK - scope=pamela source=netbackup data=policies collected=3200 parsed=3200 sent
 Codes de retour : `0 OK`, `1 WARNING`, `2 CRITICAL`, `3 UNKNOWN`.
 
 Pour changer le texte du contrôle, le niveau ou le format des logs, ou la conversion
-des statuts en codes retour, modifier uniquement `icinga_handler.py`.
+des statuts en codes retour, modifier uniquement `modules/icinga/handler.py`.
 
 ## Tests
 

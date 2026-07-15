@@ -1,7 +1,7 @@
-from outputs.backup_hub import BackupHubOutput
+from modules.backup_hub.output import BackupHubOutput
 from outputs.json_file import JsonFileOutput
-from outputs.logstash import LogstashOutput
-from outputs.reference import ReferenceOutput
+from modules.logstash.output import LogstashOutput
+from modules.referential.output import ReferentialOutput
 from outputs.stdout import StdoutOutput
 from exceptions import ConfigurationError
 from settings import Settings
@@ -9,7 +9,7 @@ from settings import Settings
 DEFAULT_OUTPUTS = {
     "pamela": "backup_hub",
     "elk": "logstash",
-    "baseline": "reference",
+    "baseline": "referential",
 }
 
 
@@ -17,7 +17,7 @@ def build_output(name: str, settings: Settings):
     outputs = {
         "backup_hub": lambda: BackupHubOutput(settings.backup_hub_url, settings.backup_hub_token),
         "logstash": lambda: LogstashOutput(settings.logstash_url, settings.logstash_token),
-        "reference": lambda: ReferenceOutput(settings.reference_url, settings.reference_token),
+        "referential": lambda: ReferentialOutput(settings.referential_url, settings.referential_token),
         "json": lambda: JsonFileOutput(settings.output_dir),
         "stdout": StdoutOutput,
     }
@@ -30,7 +30,7 @@ __all__ = [
     "BackupHubOutput",
     "JsonFileOutput",
     "LogstashOutput",
-    "ReferenceOutput",
+    "ReferentialOutput",
     "StdoutOutput",
     "DEFAULT_OUTPUTS",
     "build_output",

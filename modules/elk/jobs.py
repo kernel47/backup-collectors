@@ -1,4 +1,4 @@
-from scopes.elk.policies import parse as _parse
+from modules.elk.policies import parse as _parse
 
 
 def parse(records: list[dict]) -> list[dict]:

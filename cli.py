@@ -4,7 +4,7 @@ from typing import Sequence
 
 from context import CollectionContext
 from exceptions import BackupCollectorError
-from icinga_handler import configure_logging, handle_error, handle_success
+from modules.icinga.handler import configure_logging, handle_error, handle_success
 from runtime.executor import execute
 from settings import Settings
 
@@ -36,7 +36,7 @@ def create_parser() -> argparse.ArgumentParser:
     period.add_argument("--hours", type=int)
     period.add_argument("--days", type=int)
     collect.add_argument(
-        "--output", choices=["backup_hub", "logstash", "reference", "json", "stdout"]
+        "--output", choices=["backup_hub", "logstash", "referential", "json", "stdout"]
     )
     collect.add_argument("--dry-run", action="store_true")
     collect.add_argument("--verbose", action="store_true")

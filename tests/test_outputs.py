@@ -1,7 +1,10 @@
 import json
 
 from context import CollectionContext
+from modules.referential import ReferentialOutput
+from outputs import build_output
 from outputs.json_file import JsonFileOutput
+from settings import Settings
 
 
 def test_json_output_is_atomic_and_has_metadata(tmp_path):
@@ -17,3 +20,12 @@ def test_json_output_is_atomic_and_has_metadata(tmp_path):
     assert document["metadata"]["record_count"] == 1
     assert document["metadata"]["asset"] == "master-emea-01"
     assert document["records"] == [{"name": "daily"}]
+
+
+def test_referential_output_uses_new_module_and_name():
+    output = build_output(
+        "referential",
+        Settings(referential_url="https://referential.example.test"),
+    )
+    assert isinstance(output, ReferentialOutput)
+    assert output.destination == "Referential"

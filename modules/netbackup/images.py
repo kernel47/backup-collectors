@@ -1,8 +1,8 @@
 from typing import Any
 
 from context import CollectionContext
-from sources.netbackup.jobs import _iso
-from sources.netbackup.policies import _as_dict
+from modules.netbackup.jobs import _iso
+from modules.netbackup.policies import _as_dict
 
 
 def collect_images(client: Any, context: CollectionContext) -> list[dict]:

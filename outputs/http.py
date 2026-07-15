@@ -29,8 +29,3 @@ class HttpOutput:
         except httpx.HTTPError as exc:
             raise OutputError(f"{self.destination} unavailable: {exc}") from exc
         return len(records)
-
-
-class BackupHubOutput(HttpOutput):
-    destination = "Backup Hub"
-

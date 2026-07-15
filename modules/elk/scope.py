@@ -5,8 +5,8 @@ from context import CollectionContext
 from exceptions import ParsingError
 from outputs import DEFAULT_OUTPUTS, build_output
 from result import ExecutionResult
-from scopes.elk import images, jobs, policies, shares
-from scopes.elk.output import send_elk_result
+from modules.elk import images, jobs, policies, shares
+from modules.elk.output import send_elk_result
 from settings import Settings
 
 PARSERS = {

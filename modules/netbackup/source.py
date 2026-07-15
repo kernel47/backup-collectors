@@ -4,10 +4,10 @@ from typing import Any, Callable
 from context import CollectionContext
 from exceptions import CollectionError
 from result import CollectionResult
-from sources.netbackup.images import collect_images
-from sources.netbackup.jobs import collect_jobs
-from sources.netbackup.policies import collect_policies
-from sources.netbackup.shares import collect_shares
+from modules.netbackup.images import collect_images
+from modules.netbackup.jobs import collect_jobs
+from modules.netbackup.policies import collect_policies
+from modules.netbackup.shares import collect_shares
 
 Collector = Callable[[Any, CollectionContext], list[dict]]
 

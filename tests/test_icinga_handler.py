@@ -1,5 +1,5 @@
 from context import CollectionContext
-from icinga_handler import handle_error, handle_success
+from modules.icinga.handler import handle_error, handle_success
 from result import ExecutionResult
 
 

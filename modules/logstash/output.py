@@ -1,6 +1,5 @@
-from outputs.backup_hub import HttpOutput
+from outputs.http import HttpOutput
 
 
 class LogstashOutput(HttpOutput):
     destination = "Logstash"
-

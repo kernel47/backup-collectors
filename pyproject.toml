@@ -20,11 +20,11 @@ dev = ["pytest>=8.2", "ruff>=0.5"]
 backup-collector = "cli:main"
 
 [tool.setuptools]
-py-modules = ["cli", "context", "exceptions", "icinga_handler", "result", "settings"]
+py-modules = ["cli", "context", "exceptions", "result", "settings"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["external*", "outputs*", "runtime*", "scopes*", "sources*"]
+include = ["modules*", "outputs*", "runtime*", "scopes*", "sources*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

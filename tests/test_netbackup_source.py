@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from context import CollectionContext
-from sources.netbackup import NetBackupSource
+from modules.netbackup import NetBackupSource
 
 
 class Model:

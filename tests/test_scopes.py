@@ -1,4 +1,4 @@
-from scopes.elk.policies import parse as parse_elk_policies
+from modules.elk.policies import parse as parse_elk_policies
 from scopes.pamela.policies import parse as parse_pamela_policies
 
 

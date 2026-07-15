@@ -1,7 +1,7 @@
 from typing import Any
 
 from context import CollectionContext
-from sources.netbackup.policies import _as_dict
+from modules.netbackup.policies import _as_dict
 
 
 def collect_shares(client: Any, context: CollectionContext) -> list[dict]:

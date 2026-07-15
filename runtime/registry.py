@@ -1,8 +1,8 @@
 from scopes.baseline import BaselineScope
-from scopes.elk import ElkScope
+from modules.elk import ElkScope
 from scopes.pamela import PamelaScope
 from sources.datadomain import DataDomainSource
-from sources.netbackup import NetBackupSource
+from modules.netbackup import NetBackupSource
 from sources.tapelibrary import TapeLibrarySource
 
 SOURCES = {

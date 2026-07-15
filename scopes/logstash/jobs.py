@@ -1,4 +1,4 @@
-from modules.elk.policies import parse as _parse
+from scopes.logstash.policies import parse as _parse
 
 
 def parse(records: list[dict]) -> list[dict]:
@@ -7,4 +7,3 @@ def parse(records: list[dict]) -> list[dict]:
         record["data"]["type"] = "jobs"
         record["@timestamp"] = record.get("start_time") or record["@timestamp"]
     return parsed
-

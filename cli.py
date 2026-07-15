@@ -36,7 +36,7 @@ def create_parser() -> argparse.ArgumentParser:
     period.add_argument("--hours", type=int)
     period.add_argument("--days", type=int)
     collect.add_argument(
-        "--output", choices=["backup_hub", "logstash", "referential", "json", "stdout"]
+        "--output", choices=["backup_hub", "logstash", "referential", "file", "stdout"]
     )
     collect.add_argument("--dry-run", action="store_true")
     collect.add_argument("--verbose", action="store_true")

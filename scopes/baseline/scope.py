@@ -2,10 +2,9 @@ from time import monotonic
 from typing import Any
 
 from context import CollectionContext
-from outputs import DEFAULT_OUTPUTS, build_output
+from modules.output import OutputService
 from result import ExecutionResult
 from scopes.baseline.collector import BaselineCollector
-from scopes.baseline.output import send_baseline_result
 from scopes.baseline.parser import parse
 from scopes.baseline.rules import evaluate
 from settings import Settings
@@ -13,8 +12,8 @@ from settings import Settings
 
 class BaselineScope:
     def __init__(self, settings: Settings) -> None:
-        self.settings = settings
         self.collector = BaselineCollector()
+        self.output_service = OutputService(settings)
 
     def execute(self, source: Any, context: CollectionContext) -> ExecutionResult:
         started = monotonic()
@@ -22,12 +21,11 @@ class BaselineScope:
         findings = parse(evaluate(datasets))
         sent = 0
         if not context.dry_run:
-            name = context.output or DEFAULT_OUTPUTS[context.scope]
-            sent = send_baseline_result(
+            sent = self.output_service.send(
                 findings,
                 context,
-                build_output(name, self.settings),
-                context.asset,
+                asset=context.asset,
+                metadata={"workflow": "baseline"},
             )
         collected_count = sum(len(records) for records in datasets.values())
         return ExecutionResult(

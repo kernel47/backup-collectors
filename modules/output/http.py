@@ -7,11 +7,15 @@ from exceptions import ConfigurationError, OutputError
 
 
 class HttpOutput:
-    destination = "HTTP"
-
-    def __init__(self, url: str | None, token: str | None = None) -> None:
+    def __init__(
+        self,
+        url: str | None,
+        token: str | None = None,
+        destination: str = "HTTP",
+    ) -> None:
         self.url = url
         self.token = token
+        self.destination = destination
 
     def send(
         self,

@@ -5,13 +5,13 @@ import pytest
 
 from context import CollectionContext
 from exceptions import ConfigurationError, UnsupportedCollectionError
+from modules.netbackup import NetBackupSource
 from modules.netbackup.client import create_client
 from runtime.executor import execute, validate_context
 from runtime.registry import SCOPES, SOURCES
-from modules.elk import ElkScope
+from scopes.logstash import LogstashScope
 from scopes.pamela import PamelaScope
 from settings import Settings
-from modules.netbackup import NetBackupSource
 
 
 class FakePolicies:
@@ -36,11 +36,11 @@ def test_unsupported_collection_is_rejected():
 def test_registry_selects_expected_source_and_scopes():
     assert SOURCES["netbackup"] is NetBackupSource
     assert SCOPES["pamela"] is PamelaScope
-    assert SCOPES["elk"] is ElkScope
+    assert SCOPES["logstash"] is LogstashScope
 
 
-def test_json_output_override_avoids_http(tmp_path):
-    context = CollectionContext("netbackup", "policies", "pamela", output="json")
+def test_file_output_override_avoids_http(tmp_path):
+    context = CollectionContext("netbackup", "policies", "pamela", output="file")
     settings = Settings(output_dir=tmp_path)
     result = execute(context, settings=settings, source_client=FakeClient())
     assert result.sent_count == 1

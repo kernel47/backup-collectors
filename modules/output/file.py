@@ -8,7 +8,7 @@ from context import CollectionContext
 from exceptions import OutputError
 
 
-class JsonFileOutput:
+class FileOutput:
     def __init__(self, output_dir: Path | str) -> None:
         self.output_dir = Path(output_dir)
 

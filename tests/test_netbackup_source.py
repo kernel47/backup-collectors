@@ -41,7 +41,6 @@ def test_collect_policies_through_nbu_service():
 
 def test_shares_temporary_adapter_uses_policy_clients():
     result = NetBackupSource(client()).collect(
-        "shares", CollectionContext("netbackup", "shares", "elk")
+        "shares", CollectionContext("netbackup", "shares", "logstash")
     )
     assert result.records == [{"value": "client-01"}]
-

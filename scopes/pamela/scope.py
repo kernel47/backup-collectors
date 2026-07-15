@@ -3,10 +3,9 @@ from typing import Any
 
 from context import CollectionContext
 from exceptions import ParsingError
-from outputs import DEFAULT_OUTPUTS, build_output
+from modules.output import OutputService
 from result import ExecutionResult
 from scopes.pamela import jobs, policies
-from scopes.pamela.output import send_pamela_result
 from settings import Settings
 
 PARSERS = {"policies": policies.parse, "jobs": jobs.parse}
@@ -14,7 +13,7 @@ PARSERS = {"policies": policies.parse, "jobs": jobs.parse}
 
 class PamelaScope:
     def __init__(self, settings: Settings) -> None:
-        self.settings = settings
+        self.output_service = OutputService(settings)
 
     def execute(self, source: Any, context: CollectionContext) -> ExecutionResult:
         started = monotonic()
@@ -25,9 +24,10 @@ class PamelaScope:
             raise ParsingError(f"Pamela parsing failed: {exc}") from exc
         sent = 0
         if not context.dry_run:
-            name = context.output or DEFAULT_OUTPUTS[context.scope]
-            sent = send_pamela_result(
-                parsed, context, build_output(name, self.settings), collected.asset
+            sent = self.output_service.send(
+                parsed,
+                context,
+                asset=collected.asset,
             )
         return ExecutionResult(
             context.source,

@@ -16,7 +16,7 @@ def test_context_is_created_from_cli_arguments():
             "--hours",
             "24",
             "--output",
-            "json",
+            "file",
             "--dry-run",
         ]
     )
@@ -26,7 +26,7 @@ def test_context_is_created_from_cli_arguments():
     assert context.scope == "pamela"
     assert context.asset == "master-01"
     assert context.hours == 24
-    assert context.output == "json"
+    assert context.output == "file"
     assert context.dry_run is True
 
 
@@ -46,4 +46,3 @@ def test_expected_error_becomes_icinga_critical(monkeypatch, capsys):
     code = cli.main(["collect", "netbackup", "policies", "--scope", "pamela"])
     assert code == 2
     assert "CRITICAL" in capsys.readouterr().out
-

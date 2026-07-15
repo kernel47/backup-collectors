@@ -8,37 +8,43 @@ Une collecte est définie par trois valeurs :
 
 - la **source** récupère les données de l'asset (`netbackup`) ;
 - le **data type** indique les données (`policies`, `jobs`, `images`, `shares`) ;
-- le **scope** choisit le format et la destination (`pamela`, `elk`, `baseline`).
+- le **scope** choisit le parser et la destination par défaut
+  (`pamela`, `logstash`, `baseline`).
 
 La séparation reste volontairement directe :
 
 ```text
-CLI -> Source -> CollectionResult -> Scope/Parser -> Output -> ExecutionResult
+CLI -> Module de collecte -> Scope/Parser -> OutputService -> Destination
 ```
 
 Tout le comportement visible par Icinga est regroupé dans `modules/icinga/handler.py` :
 format des lignes `OK/WARNING/CRITICAL/UNKNOWN`, codes de retour et configuration du
 logging. Ce fichier peut être modifié seul pour adapter l'intégration Icinga.
 
-Les intégrations NetBackup, Backup Hub, Referential, Logstash, ELK et Icinga sont
-regroupées dans `modules/`. Les outputs locaux et génériques, comme JSON, stdout et le
-transport HTTP commun, restent dans `outputs/`.
+Les composants techniques partagés sont regroupés dans `modules/`. Les parsers restent
+dans leur scope métier. Il n'existe pas de composant ELK : le scope `logstash` prépare
+les événements et Logstash assure ensuite leur acheminement vers ELK.
 
 ```text
 modules/
-├── backup_hub/
-├── elk/
+├── datadomain/
 ├── icinga/
-├── logstash/
 ├── netbackup/
-└── referential/
+├── output/
+└── tapelibrary/
+
+scopes/
+├── baseline/
+├── logstash/
+└── pamela/
 ```
 
 NetBackup passe exclusivement par le package Python `nbu`, isolé derrière l'adaptateur
 `modules/netbackup/client.py`. Backup Collector lui transmet uniquement le hostname du master
 server ; `netbackup-py` reste responsable de retrouver sa configuration et ses secrets.
-Pamela envoie par défaut vers Backup Hub, ELK vers Logstash et Baseline vers le
-référentiel. Les destinations JSON et stdout permettent de tester sans appel HTTP.
+Pamela envoie par défaut vers Backup Hub, le scope Logstash vers Logstash et Baseline
+vers le référentiel. `--output file` ou `--output stdout` permettent de tester sans
+appel HTTP.
 
 ## Installation et configuration
 
@@ -57,7 +63,7 @@ BACKUP_COLLECTOR_OUTPUT_DIR, BACKUP_COLLECTOR_LOG_LEVEL
 
 Backup Collector ne lit aucune variable de connexion NetBackup et ne stocke aucun mot
 de passe NetBackup. Le hostname du master server est fourni avec
-`--asset MASTER_SERVER`. Une sortie JSON n'exige aucune URL HTTP.
+`--asset MASTER_SERVER`. Une sortie fichier n'exige aucune URL HTTP.
 
 ## Exemples
 
@@ -72,18 +78,18 @@ backup-collector collect netbackup jobs \
   --hours 24
 
 backup-collector collect netbackup shares \
-  --scope elk \
+  --scope logstash \
   --asset master-emea-01
 
 backup-collector collect netbackup images \
-  --scope elk \
+  --scope logstash \
   --asset master-emea-01 \
-  --output json
+  --output file
 
 backup-collector collect netbackup baseline \
   --scope baseline \
   --asset master-emea-01 \
-  --output json
+  --output file
 ```
 
 Pour une vérification sans écriture ni envoi, ajouter `--dry-run`. Pour afficher les
@@ -100,10 +106,10 @@ $BACKUP_COLLECTOR_OUTPUT_DIR/<scope>/<source>/<data_type>/
   l'ajouter à `runtime/registry.py`.
 - **Nouveau type de données** : ajouter un petit collecteur au dossier de la source,
   son parser dans le scope et déclarer la combinaison supportée.
-- **Nouveau scope** : créer sa classe `execute`, ses fonctions de parsing et son fin
-  adaptateur d'output, puis l'inscrire dans `SCOPES`.
-- **Nouvel output** : implémenter `send(records, context, metadata)`, puis l'ajouter au
-  dictionnaire de `outputs/__init__.py`.
+- **Nouveau scope** : créer sa classe `execute` et ses fonctions de parsing, puis
+  l'inscrire dans `SCOPES` et dans les destinations par défaut d'`OutputService`.
+- **Nouvelle destination** : l'ajouter à `modules/output/service.py`. Le service choisit
+  ensuite HTTP, fichier ou stdout à partir de `--output` ou du scope.
 - **Nouveau module externe** : déclarer sa dépendance dans `pyproject.toml`, puis créer
   un sous-dossier et un adaptateur minimal dans `modules/`. Les secrets restent gérés par le module
   externe ou le référentiel, jamais par Backup Collector.

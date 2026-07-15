@@ -1,4 +1,4 @@
-from modules.elk.policies import parse as _parse
+from scopes.logstash.policies import parse as _parse
 
 
 def parse(records: list[dict]) -> list[dict]:
@@ -6,4 +6,3 @@ def parse(records: list[dict]) -> list[dict]:
     for record in parsed:
         record["data"]["type"] = "shares"
     return parsed
-

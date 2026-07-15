@@ -1,9 +1,9 @@
 from scopes.baseline import BaselineScope
-from modules.elk import ElkScope
+from scopes.logstash import LogstashScope
 from scopes.pamela import PamelaScope
-from sources.datadomain import DataDomainSource
+from modules.datadomain import DataDomainSource
 from modules.netbackup import NetBackupSource
-from sources.tapelibrary import TapeLibrarySource
+from modules.tapelibrary import TapeLibrarySource
 
 SOURCES = {
     "netbackup": NetBackupSource,
@@ -13,13 +13,12 @@ SOURCES = {
 
 SCOPES = {
     "pamela": PamelaScope,
-    "elk": ElkScope,
+    "logstash": LogstashScope,
     "baseline": BaselineScope,
 }
 
 SUPPORTED_COLLECTIONS = {
     "pamela": {"netbackup": {"policies", "jobs"}},
-    "elk": {"netbackup": {"policies", "jobs", "images", "shares"}},
+    "logstash": {"netbackup": {"policies", "jobs", "images", "shares"}},
     "baseline": {"netbackup": {"baseline"}},
 }
-

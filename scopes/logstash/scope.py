@@ -3,10 +3,9 @@ from typing import Any
 
 from context import CollectionContext
 from exceptions import ParsingError
-from outputs import DEFAULT_OUTPUTS, build_output
+from modules.output import OutputService
 from result import ExecutionResult
-from modules.elk import images, jobs, policies, shares
-from modules.elk.output import send_elk_result
+from scopes.logstash import images, jobs, policies, shares
 from settings import Settings
 
 PARSERS = {
@@ -17,9 +16,9 @@ PARSERS = {
 }
 
 
-class ElkScope:
+class LogstashScope:
     def __init__(self, settings: Settings) -> None:
-        self.settings = settings
+        self.output_service = OutputService(settings)
 
     def execute(self, source: Any, context: CollectionContext) -> ExecutionResult:
         started = monotonic()
@@ -27,13 +26,12 @@ class ElkScope:
         try:
             parsed = PARSERS[context.data_type](collected.records)
         except (KeyError, TypeError, ValueError) as exc:
-            raise ParsingError(f"ELK parsing failed: {exc}") from exc
+            raise ParsingError(f"Logstash parsing failed: {exc}") from exc
         for record in parsed:
             record["source"]["asset"] = record["source"].get("asset") or collected.asset
         sent = 0
         if not context.dry_run:
-            name = context.output or DEFAULT_OUTPUTS[context.scope]
-            sent = send_elk_result(parsed, context, build_output(name, self.settings), collected.asset)
+            sent = self.output_service.send(parsed, context, asset=collected.asset)
         return ExecutionResult(
             context.source,
             context.data_type,

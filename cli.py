@@ -1,15 +1,12 @@
 import argparse
 from datetime import datetime
-import logging
 from typing import Sequence
 
 from context import CollectionContext
 from exceptions import BackupCollectorError
-from result import ExecutionResult
+from icinga_handler import configure_logging, handle_error, handle_success
 from runtime.executor import execute
 from settings import Settings
-
-ICINGA_CODES = {"OK": 0, "WARNING": 1, "CRITICAL": 2, "UNKNOWN": 3}
 
 
 def _datetime(value: str) -> datetime:
@@ -62,40 +59,18 @@ def context_from_args(args: argparse.Namespace) -> CollectionContext:
     )
 
 
-def _summary(result: ExecutionResult) -> str:
-    return (
-        f"{result.status} - scope={result.scope} source={result.source} "
-        f"data={result.data_type} collected={result.collected_count} "
-        f"parsed={result.parsed_count} sent={result.sent_count} "
-        f"duration={result.duration_seconds:.1f}s"
-    )
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     args = create_parser().parse_args(argv)
     settings = Settings.from_env()
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else getattr(logging, settings.log_level.upper(), 30),
-        format="%(levelname)s %(message)s",
-    )
+    configure_logging(verbose=args.verbose, log_level=settings.log_level)
     context = context_from_args(args)
     try:
         result = execute(context, settings=settings)
     except BackupCollectorError as exc:
-        print(
-            f'CRITICAL - scope={context.scope} source={context.source} '
-            f'data={context.data_type} error="{exc}"'
-        )
-        return ICINGA_CODES["CRITICAL"]
+        return handle_error(context, exc)
     except Exception as exc:  # defensive boundary for Icinga
-        logging.exception("Unexpected backup collector error")
-        print(
-            f'UNKNOWN - scope={context.scope} source={context.source} '
-            f'data={context.data_type} error="{exc}"'
-        )
-        return ICINGA_CODES["UNKNOWN"]
-    print(_summary(result))
-    return ICINGA_CODES.get(result.status, ICINGA_CODES["UNKNOWN"])
+        return handle_error(context, exc, unexpected=True)
+    return handle_success(result)
 
 
 if __name__ == "__main__":

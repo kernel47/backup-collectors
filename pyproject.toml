@@ -20,7 +20,7 @@ dev = ["pytest>=8.2", "ruff>=0.5"]
 backup-collector = "cli:main"
 
 [tool.setuptools]
-py-modules = ["cli", "context", "exceptions", "result", "settings"]
+py-modules = ["cli", "context", "exceptions", "icinga_handler", "result", "settings"]
 
 [tool.setuptools.packages.find]
 where = ["."]

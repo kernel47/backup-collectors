@@ -16,6 +16,11 @@ La séparation reste volontairement directe :
 CLI -> Source -> CollectionResult -> Scope/Parser -> Output -> ExecutionResult
 ```
 
+Tout le comportement visible par Icinga est regroupé dans `icinga_handler.py` : format
+des lignes `OK/WARNING/CRITICAL/UNKNOWN`, codes de retour et configuration du logging.
+Ce fichier peut être modifié seul pour adapter l'intégration Icinga. Les transports de
+données métier (Backup Hub, Logstash, JSON, etc.) restent dans `outputs/`.
+
 NetBackup passe exclusivement par le package Python `nbu`, isolé derrière l'adaptateur
 `external/netbackup.py`. Backup Collector lui transmet uniquement le hostname du master
 server ; `netbackup-py` reste responsable de retrouver sa configuration et ses secrets.
@@ -106,6 +111,9 @@ OK - scope=pamela source=netbackup data=policies collected=3200 parsed=3200 sent
 ```
 
 Codes de retour : `0 OK`, `1 WARNING`, `2 CRITICAL`, `3 UNKNOWN`.
+
+Pour changer le texte du contrôle, le niveau ou le format des logs, ou la conversion
+des statuts en codes retour, modifier uniquement `icinga_handler.py`.
 
 ## Tests
 

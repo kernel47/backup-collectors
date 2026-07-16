@@ -2,8 +2,7 @@
 
 import logging
 
-from context import CollectionContext
-from result import ExecutionResult
+from models import CollectionContext, ExecutionResult
 
 EXIT_CODES = {"OK": 0, "WARNING": 1, "CRITICAL": 2, "UNKNOWN": 3}
 
@@ -39,4 +38,3 @@ def handle_error(
         f'data={context.data_type} error="{message}"'
     )
     return EXIT_CODES[status]
-

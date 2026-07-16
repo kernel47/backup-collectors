@@ -2,11 +2,10 @@ import argparse
 from datetime import datetime
 from typing import Sequence
 
-from context import CollectionContext
 from exceptions import BackupCollectorError
+from models import CollectionContext, Settings
 from modules.icinga import configure_logging, handle_error, handle_success
 from runtime import execute
-from settings import Settings
 
 
 def parse_datetime(value: str) -> datetime:

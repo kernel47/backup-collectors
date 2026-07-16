@@ -1,4 +1,4 @@
-from context import CollectionContext
+from models import CollectionContext
 from parsers.logstash import parse as parse_logstash
 from parsers.pamela import parse as parse_pamela
 from parsers.service import parse_for_scope

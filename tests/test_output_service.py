@@ -1,8 +1,7 @@
 import json
 
-from context import CollectionContext
 from modules import output
-from settings import Settings
+from models import CollectionContext, Settings
 
 
 def test_file_output_is_atomic_and_has_metadata(tmp_path):

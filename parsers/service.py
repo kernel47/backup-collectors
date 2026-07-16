@@ -1,4 +1,4 @@
-from context import CollectionContext
+from models import CollectionContext
 from exceptions import ParsingError
 from parsers import baseline, logstash, pamela
 

@@ -5,9 +5,8 @@ from typing import Any
 
 import httpx
 
-from context import CollectionContext
 from exceptions import ConfigurationError, OutputError
-from settings import Settings
+from models import CollectionContext, Settings
 
 
 def send(

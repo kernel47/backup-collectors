@@ -1,6 +1,6 @@
 import cli
 from exceptions import ConfigurationError
-from result import ExecutionResult
+from models import ExecutionResult
 
 
 def test_context_is_created_from_cli_arguments():

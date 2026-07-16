@@ -1,12 +1,10 @@
 from time import monotonic
 from typing import Any
 
-from context import CollectionContext
 from exceptions import UnsupportedCollectionError
+from models import CollectionContext, ExecutionResult, Settings
 from modules import datadomain, netbackup, output, tapelibrary
 from parsers.service import parse_for_scope
-from result import ExecutionResult
-from settings import Settings
 
 
 def validate_context(context: CollectionContext) -> None:

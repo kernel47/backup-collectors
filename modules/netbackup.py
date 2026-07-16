@@ -1,9 +1,8 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from context import CollectionContext
 from exceptions import CollectionError, ConfigurationError
-from result import CollectionResult
+from models import CollectionContext, CollectionResult
 
 
 def create_client(master_server: str) -> Any:
@@ -72,4 +71,3 @@ def _as_dict(item: Any) -> dict:
     if hasattr(item, "model_dump"):
         return item.model_dump(mode="json")
     raise TypeError(f"Unsupported NetBackup record type: {type(item).__name__}")
-

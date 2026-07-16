@@ -3,11 +3,10 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from context import CollectionContext
 from exceptions import CollectionError, ConfigurationError, UnsupportedCollectionError
+from models import CollectionContext, Settings
 from modules.netbackup import create_client
 from runtime import execute, validate_context
-from settings import Settings
 
 
 class FakePolicies:

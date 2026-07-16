@@ -40,8 +40,8 @@ Les fichiers racine restent simples :
 
 - `cli.py` définit les arguments, crée le contexte et lance la commande ;
 - `runtime.py` exécute le flux complet ;
-- `context.py` et `result.py` contiennent les dataclasses ;
-- `settings.py` lit les URLs et tokens des destinations ;
+- `models.py` contient toutes les dataclasses, y compris le contexte, les résultats et
+  les réglages des destinations ;
 - `exceptions.py` contient les erreurs applicatives.
 
 ## Installation

@@ -1,6 +1,5 @@
-from context import CollectionContext
 from modules.icinga import handle_error, handle_success
-from result import ExecutionResult
+from models import CollectionContext, ExecutionResult
 
 
 def test_warning_output_and_exit_code(capsys):

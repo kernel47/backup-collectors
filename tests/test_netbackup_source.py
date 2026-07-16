@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from context import CollectionContext
+from models import CollectionContext
 from modules.netbackup import collect
 
 

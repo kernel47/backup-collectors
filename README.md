@@ -10,7 +10,8 @@ cli.py
   -> cli_helper.py
   -> runtime.py
   -> modules/netbackup.py ou modules/datadomain.py
-  -> scopes/pamela.py, scopes/logstash.py ou scopes/baseline.py
+  -> parsers/service.py
+  -> parsers/pamela.py, parsers/logstash.py ou parsers/baseline.py
   -> modules/output.py
   -> Backup Hub, Logstash, Referential, fichier ou stdout
 ```
@@ -29,10 +30,11 @@ modules/
 ├── output.py        # sélection et envoi HTTP, fichier ou stdout
 └── icinga.py        # messages, logs et codes retour Icinga
 
-scopes/
+parsers/
 ├── pamela.py        # parsing Pamela
 ├── logstash.py      # parsing des événements envoyés à Logstash
-└── baseline.py      # règles et format Baseline
+├── baseline.py      # règles et format Baseline
+└── service.py       # sélection explicite du parser selon le scope
 ```
 
 Les fichiers racine restent simples :

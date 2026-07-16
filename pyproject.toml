@@ -24,7 +24,7 @@ py-modules = ["cli", "cli_helper", "context", "exceptions", "result", "runtime",
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["modules*", "scopes*"]
+include = ["modules*", "parsers*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

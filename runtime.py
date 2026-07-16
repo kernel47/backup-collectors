@@ -4,8 +4,8 @@ from typing import Any
 from context import CollectionContext
 from exceptions import UnsupportedCollectionError
 from modules import datadomain, netbackup, output, tapelibrary
+from parsers.service import parse_for_scope
 from result import ExecutionResult
-from scopes import baseline, logstash, pamela
 from settings import Settings
 
 
@@ -51,12 +51,7 @@ def execute(
         else:
             collected = tapelibrary.collect(context.data_type, context)
 
-        if context.scope == "pamela":
-            parsed = pamela.parse(context.data_type, collected.records)
-        elif context.scope == "logstash":
-            parsed = logstash.parse(context.data_type, collected.records, collected.asset)
-        else:
-            parsed = baseline.parse(collected.records)
+        parsed = parse_for_scope(context, collected.records, collected.asset)
 
         sent = 0
         if not context.dry_run:

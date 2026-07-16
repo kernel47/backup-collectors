@@ -56,6 +56,18 @@ Les fichiers racine restent simples :
 python -m pip install -e '.[dev]'
 ```
 
+Créer ensuite la configuration locale à partir de l'exemple :
+
+```bash
+cp .env.example .env
+set -a
+source .env
+set +a
+```
+
+Le programme lit les variables d'environnement ; il ne charge pas automatiquement le
+fichier `.env`.
+
 Le module `netbackup-py` reçoit uniquement le hostname du master server. Il reste
 responsable de chercher sa configuration et ses secrets dans le référentiel.
 

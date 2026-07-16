@@ -7,6 +7,7 @@ Le flux est volontairement explicite :
 
 ```text
 cli.py
+  -> cli_helper.py
   -> runtime.py
   -> modules/netbackup.py ou modules/datadomain.py
   -> scopes/pamela.py, scopes/logstash.py ou scopes/baseline.py
@@ -36,7 +37,8 @@ scopes/
 
 Les fichiers racine restent simples :
 
-- `cli.py` lit la commande et crée le contexte ;
+- `cli.py` est uniquement le point d'entrée de la commande ;
+- `cli_helper.py` définit les arguments et crée le contexte ;
 - `runtime.py` exécute le flux complet ;
 - `context.py` et `result.py` contiennent les dataclasses ;
 - `settings.py` lit les URLs et tokens des destinations ;
@@ -132,4 +134,3 @@ ruff check .
 ```
 
 Les tests n'effectuent aucun appel réel vers NetBackup ou une destination HTTP.
-

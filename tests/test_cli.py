@@ -3,6 +3,12 @@ from exceptions import ConfigurationError
 from models import ExecutionResult
 
 
+def test_cli_help_contains_examples():
+    help_text = cli.create_parser().format_help()
+    assert "Exemples:" in help_text
+    assert "collect netbackup policies" in help_text
+
+
 def test_context_is_created_from_cli_arguments():
     args = cli.create_parser().parse_args(
         [

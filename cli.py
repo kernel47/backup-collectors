@@ -7,6 +7,14 @@ from models import CollectionContext, Settings
 from services.icinga import configure_logging, handle_error, handle_success
 from runtime import execute
 
+CLI_EXAMPLES = """Exemples:
+  backup-collector collect netbackup policies --asset master-01 --scope pamela
+  backup-collector collect netbackup jobs --asset master-01 --scope pamela --hours 24
+  backup-collector collect netbackup images --asset master-01 --scope logstash
+  backup-collector collect netbackup shares --asset master-01 --scope logstash --output file
+  backup-collector collect netbackup baseline --asset master-01 --scope baseline
+"""
+
 
 def parse_datetime(value: str) -> datetime:
     try:
@@ -16,12 +24,32 @@ def parse_datetime(value: str) -> datetime:
 
 
 def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="backup-collector")
+    parser = argparse.ArgumentParser(
+        prog="backup-collector",
+        description="Collect, parse and send backup asset data.",
+        epilog=CLI_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    collect = subparsers.add_parser("collect", help="run a collection pipeline")
-    collect.add_argument("source")
-    collect.add_argument("data_type")
-    collect.add_argument("--scope", required=True)
+    collect = subparsers.add_parser(
+        "collect",
+        help="run a collection pipeline",
+        description="Collect a data type from an asset, parse it by scope, then send it.",
+        epilog=CLI_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    collect.add_argument(
+        "source",
+        choices=["netbackup", "datadomain", "tapelibrary"],
+        help="asset collector to use",
+    )
+    collect.add_argument("data_type", help="policies, jobs, images, shares or baseline")
+    collect.add_argument(
+        "--scope",
+        required=True,
+        choices=["pamela", "logstash", "baseline"],
+        help="parser and default destination",
+    )
 
     assets = collect.add_mutually_exclusive_group()
     assets.add_argument(
@@ -29,19 +57,21 @@ def create_parser() -> argparse.ArgumentParser:
         metavar="MASTER_SERVER",
         help="master server hostname passed to the source module",
     )
-    assets.add_argument("--all-assets", action="store_true")
+    assets.add_argument("--all-assets", action="store_true", help="reserved for future use")
 
-    collect.add_argument("--start-time", type=parse_datetime)
-    collect.add_argument("--end-time", type=parse_datetime)
+    collect.add_argument("--start-time", type=parse_datetime, metavar="ISO_DATETIME")
+    collect.add_argument("--end-time", type=parse_datetime, metavar="ISO_DATETIME")
     period = collect.add_mutually_exclusive_group()
-    period.add_argument("--hours", type=int)
-    period.add_argument("--days", type=int)
+    period.add_argument("--hours", type=int, help="collect the last N hours")
+    period.add_argument("--days", type=int, help="collect the last N days")
 
     collect.add_argument(
-        "--output", choices=["backup_hub", "logstash", "referential", "file", "stdout"]
+        "--output",
+        choices=["backup_hub", "logstash", "referential", "file", "stdout"],
+        help="override the destination selected by the scope",
     )
-    collect.add_argument("--dry-run", action="store_true")
-    collect.add_argument("--verbose", action="store_true")
+    collect.add_argument("--dry-run", action="store_true", help="collect and parse without sending")
+    collect.add_argument("--verbose", action="store_true", help="enable debug logs")
     return parser
 
 

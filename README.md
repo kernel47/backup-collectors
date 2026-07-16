@@ -70,6 +70,13 @@ BACKUP_COLLECTOR_OUTPUT_DIR, BACKUP_COLLECTOR_LOG_LEVEL
 
 ## Commandes
 
+L'aide intégrée rappelle les paramètres disponibles et contient des exemples :
+
+```bash
+backup-collector --help
+backup-collector collect --help
+```
+
 ```bash
 backup-collector collect netbackup policies \
   --asset master-emea-01 \

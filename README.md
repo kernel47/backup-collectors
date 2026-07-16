@@ -8,6 +8,7 @@ Le flux est volontairement explicite :
 ```text
 cli.py
   -> runtime.py
+  -> services/referential.py pour résoudre le hostname en objet Asset
   -> collectors/netbackup.py ou collectors/datadomain.py
   -> modules/netbackup.py pour accéder au package externe nbu
   -> parsers/service.py
@@ -38,6 +39,7 @@ parsers/
 └── service.py       # sélection explicite du parser selon le scope
 
 services/
+├── referential.py   # recherche d'un asset à partir de son hostname
 ├── output.py        # Backup Hub, Logstash, Referential, fichier et stdout
 └── icinga.py        # messages, logs et codes retour Icinga
 ```
@@ -77,17 +79,42 @@ set +a
 Le programme lit les variables d'environnement ; il ne charge pas automatiquement le
 fichier `.env`.
 
-Le module `netbackup-py` reçoit uniquement le hostname du master server. Il reste
-responsable de chercher sa configuration et ses secrets dans le référentiel.
+La valeur de `--asset` est toujours un hostname. Avant la collecte, le runtime appelle
+le référentiel externe et construit un objet `Asset` contenant :
+
+```text
+hostname
+api_username, api_password, api
+ssh_username, ssh_password, ssh
+domain_type, domain_name, version
+region, datacenter
+```
+
+Les noms `api_username` et `ssh_username` évitent toute ambiguïté entre les deux jeux
+d'identifiants. Les mots de passe sont exclus de la représentation texte de l'objet
+pour éviter leur apparition accidentelle dans les logs.
+
+`REFERENTIAL_ASSET_URL` configure la recherche. L'URL peut contenir le placeholder
+`{hostname}` ; sinon le hostname est ajouté à la fin du chemin :
+
+```text
+REFERENTIAL_ASSET_URL=https://referential.example.test/api/assets/{hostname}
+```
+
+`modules/netbackup.py` utilise ensuite les paramètres API de cet objet pour créer le
+client `netbackup-py`. Le support SSH pourra utiliser les paramètres SSH du même objet.
 
 Variables disponibles pour les destinations :
 
 ```text
 BACKUP_HUB_URL, BACKUP_HUB_TOKEN
 LOGSTASH_URL, LOGSTASH_TOKEN
-REFERENTIAL_URL, REFERENTIAL_TOKEN
+REFERENTIAL_ASSET_URL, REFERENTIAL_URL, REFERENTIAL_TOKEN
 BACKUP_COLLECTOR_OUTPUT_DIR, BACKUP_COLLECTOR_LOG_LEVEL
 ```
+
+`REFERENTIAL_ASSET_URL` sert à lire la configuration de l'asset.
+`REFERENTIAL_URL` reste la destination d'écriture du scope `baseline`.
 
 ## Commandes
 

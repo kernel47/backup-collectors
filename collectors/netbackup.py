@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from exceptions import CollectionError
-from models import CollectionContext, CollectionResult
+from models import Asset, CollectionContext, CollectionResult
 from modules.netbackup import create_client
 
 
@@ -10,11 +10,14 @@ def collect(
     data_type: str,
     context: CollectionContext,
     client: Any = None,
+    asset: Asset | None = None,
 ) -> CollectionResult:
     """Collect one NetBackup data type with explicit, easy-to-follow branches."""
     owns_client = client is None
     if client is None:
-        client = create_client(context.asset or "")
+        if asset is None:
+            raise CollectionError("NetBackup asset was not resolved by the referential")
+        client = create_client(asset)
     started_at = datetime.now(UTC)
     try:
         try:
@@ -35,11 +38,15 @@ def collect(
         except Exception as exc:
             raise CollectionError(f"NetBackup {data_type} collection failed: {exc}") from exc
 
-        asset = context.asset or getattr(getattr(client, "config", None), "master", "unknown")
+        hostname = (
+            asset.hostname
+            if asset
+            else context.asset or getattr(getattr(client, "config", None), "master", "unknown")
+        )
         return CollectionResult(
             source="netbackup",
             data_type=data_type,
-            asset=asset,
+            asset=hostname,
             records=records,
             started_at=started_at,
             finished_at=datetime.now(UTC),

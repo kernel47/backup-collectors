@@ -54,8 +54,8 @@ def create_parser() -> argparse.ArgumentParser:
     assets = collect.add_mutually_exclusive_group()
     assets.add_argument(
         "--asset",
-        metavar="MASTER_SERVER",
-        help="master server hostname passed to the source module",
+        metavar="HOSTNAME",
+        help="asset hostname resolved through the external referential",
     )
     assets.add_argument("--all-assets", action="store_true", help="reserved for future use")
 

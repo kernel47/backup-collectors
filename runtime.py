@@ -5,7 +5,7 @@ from collectors import datadomain, netbackup, tapelibrary
 from exceptions import UnsupportedCollectionError
 from models import CollectionContext, ExecutionResult, Settings
 from parsers.service import parse_for_scope
-from services import output
+from services import output, referential
 
 
 def validate_context(context: CollectionContext) -> None:
@@ -35,14 +35,15 @@ def execute(
     validate_context(context)
     settings = settings or Settings.from_env()
     started = monotonic()
+    asset = referential.get_asset(context.asset, settings) if context.asset else None
 
     if context.source == "netbackup":
         collection_type = "policies" if context.scope == "baseline" else context.data_type
-        collected = netbackup.collect(collection_type, context, source_client)
+        collected = netbackup.collect(collection_type, context, source_client, asset)
     elif context.source == "datadomain":
-        collected = datadomain.collect(context.data_type, context)
+        collected = datadomain.collect(context.data_type, context, asset)
     else:
-        collected = tapelibrary.collect(context.data_type, context)
+        collected = tapelibrary.collect(context.data_type, context, asset)
 
     parsed = parse_for_scope(context, collected.records, collected.asset)
 

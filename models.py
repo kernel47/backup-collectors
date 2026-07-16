@@ -6,6 +6,22 @@ from typing import Any
 
 
 @dataclass
+class Asset:
+    hostname: str
+    api_username: str | None = None
+    api_password: str | None = field(default=None, repr=False)
+    domain_type: str = ""
+    domain_name: str = ""
+    version: str | None = None
+    ssh_username: str | None = None
+    ssh_password: str | None = field(default=None, repr=False)
+    api: bool = False
+    ssh: bool = False
+    region: str | None = None
+    datacenter: str | None = None
+
+
+@dataclass
 class CollectionContext:
     source: str
     data_type: str
@@ -58,6 +74,7 @@ class Settings:
     logstash_token: str | None = None
     referential_url: str | None = None
     referential_token: str | None = None
+    referential_asset_url: str | None = None
     output_dir: Path = Path("/var/lib/backup-collector/outbox")
     log_level: str = "WARNING"
 
@@ -70,7 +87,7 @@ class Settings:
             logstash_token=os.getenv("LOGSTASH_TOKEN"),
             referential_url=os.getenv("REFERENTIAL_URL"),
             referential_token=os.getenv("REFERENTIAL_TOKEN"),
+            referential_asset_url=os.getenv("REFERENTIAL_ASSET_URL"),
             output_dir=Path(os.getenv("BACKUP_COLLECTOR_OUTPUT_DIR", cls.output_dir)),
             log_level=os.getenv("BACKUP_COLLECTOR_LOG_LEVEL", "WARNING"),
         )
-

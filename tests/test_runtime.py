@@ -4,7 +4,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 from exceptions import CollectionError, ConfigurationError, UnsupportedCollectionError
-from models import CollectionContext, Settings
+from models import Asset, CollectionContext, Settings
 from modules.netbackup import create_client
 from runtime import execute, validate_context
 
@@ -48,6 +48,25 @@ def test_file_output_override_avoids_http(tmp_path):
     assert '"asset": "master-01"' in files[0].read_text()
 
 
+def test_runtime_resolves_asset_hostname(monkeypatch):
+    context = CollectionContext(
+        "netbackup", "policies", "pamela", asset="master-01", dry_run=True
+    )
+    resolved = Asset(hostname="master-01", api=True)
+    calls = []
+
+    def fake_get_asset(hostname, settings):
+        calls.append((hostname, settings))
+        return resolved
+
+    monkeypatch.setattr("runtime.referential.get_asset", fake_get_asset)
+    settings = Settings()
+    result = execute(context, settings=settings, source_client=FakeClient())
+
+    assert calls == [("master-01", settings)]
+    assert result.sent_count == 0
+
+
 def test_nbu_package_client_is_used(monkeypatch):
     created = {}
 
@@ -58,11 +77,27 @@ def test_nbu_package_client_is_used(monkeypatch):
     module = ModuleType("nbu")
     module.NetBackup = FakeNetBackup
     monkeypatch.setitem(sys.modules, "nbu", module)
-    client = create_client("master-01")
+    asset = Asset(
+        hostname="master-01",
+        api_username="api-user",
+        api_password="api-secret",
+        domain_type="unixpwd",
+        domain_name="master-01",
+        version="11.0",
+        api=True,
+    )
+    client = create_client(asset)
     assert isinstance(client, FakeNetBackup)
-    assert created == {"master": "master-01"}
+    assert created == {
+        "master": "master-01",
+        "username": "api-user",
+        "password": "api-secret",
+        "domain_type": "unixpwd",
+        "domain_name": "master-01",
+        "version": "11.0",
+    }
 
 
-def test_nbu_client_requires_master_server_hostname():
-    with pytest.raises(ConfigurationError, match="--asset MASTER_SERVER"):
-        create_client("")
+def test_nbu_client_rejects_asset_without_api():
+    with pytest.raises(ConfigurationError, match="API is disabled"):
+        create_client(Asset(hostname="master-01", api=False))

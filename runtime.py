@@ -1,10 +1,11 @@
 from time import monotonic
 from typing import Any
 
+from collectors import datadomain, netbackup, tapelibrary
 from exceptions import UnsupportedCollectionError
 from models import CollectionContext, ExecutionResult, Settings
-from modules import datadomain, netbackup, output, tapelibrary
 from parsers.service import parse_for_scope
+from services import output
 
 
 def validate_context(context: CollectionContext) -> None:
@@ -34,44 +35,35 @@ def execute(
     validate_context(context)
     settings = settings or Settings.from_env()
     started = monotonic()
-    owns_client = False
-    client = source_client
 
-    try:
-        if context.source == "netbackup":
-            if client is None:
-                client = netbackup.create_client(context.asset or "")
-                owns_client = True
-            collection_type = "policies" if context.scope == "baseline" else context.data_type
-            collected = netbackup.collect(client, collection_type, context)
-        elif context.source == "datadomain":
-            collected = datadomain.collect(context.data_type, context)
-        else:
-            collected = tapelibrary.collect(context.data_type, context)
+    if context.source == "netbackup":
+        collection_type = "policies" if context.scope == "baseline" else context.data_type
+        collected = netbackup.collect(collection_type, context, source_client)
+    elif context.source == "datadomain":
+        collected = datadomain.collect(context.data_type, context)
+    else:
+        collected = tapelibrary.collect(context.data_type, context)
 
-        parsed = parse_for_scope(context, collected.records, collected.asset)
+    parsed = parse_for_scope(context, collected.records, collected.asset)
 
-        sent = 0
-        if not context.dry_run:
-            metadata = {"workflow": "baseline"} if context.scope == "baseline" else None
-            sent = output.send(
-                parsed,
-                context,
-                settings,
-                asset=collected.asset,
-                metadata=metadata,
-            )
-
-        return ExecutionResult(
-            source=context.source,
-            data_type=context.data_type,
-            scope=context.scope,
-            collected_count=collected.record_count,
-            parsed_count=len(parsed),
-            sent_count=sent,
-            status="OK",
-            duration_seconds=monotonic() - started,
+    sent = 0
+    if not context.dry_run:
+        metadata = {"workflow": "baseline"} if context.scope == "baseline" else None
+        sent = output.send(
+            parsed,
+            context,
+            settings,
+            asset=collected.asset,
+            metadata=metadata,
         )
-    finally:
-        if owns_client and hasattr(client, "close"):
-            client.close()
+
+    return ExecutionResult(
+        source=context.source,
+        data_type=context.data_type,
+        scope=context.scope,
+        collected_count=collected.record_count,
+        parsed_count=len(parsed),
+        sent_count=sent,
+        status="OK",
+        duration_seconds=monotonic() - started,
+    )

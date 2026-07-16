@@ -8,10 +8,11 @@ Le flux est volontairement explicite :
 ```text
 cli.py
   -> runtime.py
-  -> modules/netbackup.py ou modules/datadomain.py
+  -> collectors/netbackup.py ou collectors/datadomain.py
+  -> modules/netbackup.py pour accéder au package externe nbu
   -> parsers/service.py
   -> parsers/pamela.py, parsers/logstash.py ou parsers/baseline.py
-  -> modules/output.py
+  -> services/output.py
   -> Backup Hub, Logstash, Referential, fichier ou stdout
 ```
 
@@ -23,17 +24,22 @@ le parser et l'output.
 
 ```text
 modules/
-├── netbackup.py     # client nbu et collectes policies/jobs/images/shares
-├── datadomain.py    # emplacement du futur collecteur Data Domain
-├── tapelibrary.py   # emplacement du futur collecteur Tape Library
-├── output.py        # sélection et envoi HTTP, fichier ou stdout
-└── icinga.py        # messages, logs et codes retour Icinga
+└── netbackup.py     # wrapper du package externe netbackup-py / nbu
+
+collectors/
+├── netbackup.py     # collectes policies, jobs, images et shares
+├── datadomain.py    # futur collecteur Data Domain
+└── tapelibrary.py   # futur collecteur Tape Library
 
 parsers/
 ├── pamela.py        # parsing Pamela
 ├── logstash.py      # parsing des événements envoyés à Logstash
 ├── baseline.py      # règles et format Baseline
 └── service.py       # sélection explicite du parser selon le scope
+
+services/
+├── output.py        # Backup Hub, Logstash, Referential, fichier et stdout
+└── icinga.py        # messages, logs et codes retour Icinga
 ```
 
 Les fichiers racine restent simples :
@@ -123,7 +129,7 @@ $BACKUP_COLLECTOR_OUTPUT_DIR/<scope>/<source>/<data_type>/
 
 ## Icinga
 
-`modules/icinga.py` est le seul fichier à modifier pour changer les messages, les logs
+`services/icinga.py` est le seul fichier à modifier pour changer les messages, les logs
 ou les codes retour : `0 OK`, `1 WARNING`, `2 CRITICAL`, `3 UNKNOWN`.
 
 ## Tests

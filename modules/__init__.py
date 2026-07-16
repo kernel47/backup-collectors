@@ -1,2 +1,1 @@
-"""Integrations and functional modules used by Backup Collector."""
-
+"""Wrappers around external Python dependencies only."""

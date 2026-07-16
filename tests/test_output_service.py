@@ -1,7 +1,7 @@
 import json
 
-from modules import output
 from models import CollectionContext, Settings
+from services import output
 
 
 def test_file_output_is_atomic_and_has_metadata(tmp_path):
@@ -31,7 +31,7 @@ def test_referential_output_is_selected_by_parameter(monkeypatch):
         sent["payload"] = kwargs["json"]
         return Response()
 
-    monkeypatch.setattr("modules.output.httpx.post", fake_post)
+    monkeypatch.setattr("services.output.httpx.post", fake_post)
     context = CollectionContext("netbackup", "baseline", "baseline", output="referential")
     count = output.send(
         [{"rule": "example"}],
@@ -55,7 +55,7 @@ def test_scope_selects_logstash_by_default(monkeypatch):
         sent["payload"] = kwargs["json"]
         return Response()
 
-    monkeypatch.setattr("modules.output.httpx.post", fake_post)
+    monkeypatch.setattr("services.output.httpx.post", fake_post)
     context = CollectionContext("netbackup", "jobs", "logstash")
     count = output.send(
         [{"job_id": 42}],

@@ -1,4 +1,4 @@
-from modules.icinga import handle_error, handle_success
+from services.icinga import handle_error, handle_success
 from models import CollectionContext, ExecutionResult
 
 

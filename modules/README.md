@@ -1,12 +1,7 @@
-# Modules
+# Modules externes
 
-Chaque intégration technique tient dans un fichier :
+Ce dossier contient uniquement les wrappers des dépendances Python externes.
 
-- `netbackup.py` collecte avec `netbackup-py` (`nbu`) ;
-- `datadomain.py` réserve la future collecte Data Domain ;
-- `tapelibrary.py` réserve la future collecte Tape Library ;
-- `output.py` sélectionne et exécute l'envoi HTTP, fichier ou stdout ;
-- `icinga.py` gère les messages, logs et codes retour Icinga.
+- `netbackup.py` construit le client fourni par `netbackup-py` (`nbu`).
 
-Pour ajouter une source, créer un fichier ici puis ajouter une branche explicite dans
-`runtime.py`. Pour ajouter une destination, compléter les branches de `output.py`.
+La logique de collecte appartient à `collectors/` et les envois à `services/`.

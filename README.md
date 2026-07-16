@@ -52,6 +52,15 @@ Les fichiers racine restent simples :
 
 ## Installation
 
+Installation classique des dépendances :
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Installation du projet avec la commande `backup-collector` et les outils de
+développement :
+
 ```bash
 python -m pip install -e '.[dev]'
 ```

@@ -7,7 +7,6 @@ Le flux est volontairement explicite :
 
 ```text
 cli.py
-  -> cli_helper.py
   -> runtime.py
   -> modules/netbackup.py ou modules/datadomain.py
   -> parsers/service.py
@@ -39,8 +38,7 @@ parsers/
 
 Les fichiers racine restent simples :
 
-- `cli.py` est uniquement le point d'entrée de la commande ;
-- `cli_helper.py` définit les arguments et crée le contexte ;
+- `cli.py` définit les arguments, crée le contexte et lance la commande ;
 - `runtime.py` exécute le flux complet ;
 - `context.py` et `result.py` contiennent les dataclasses ;
 - `settings.py` lit les URLs et tokens des destinations ;

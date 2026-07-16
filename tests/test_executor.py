@@ -4,13 +4,9 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 from context import CollectionContext
-from exceptions import ConfigurationError, UnsupportedCollectionError
-from modules.netbackup import NetBackupSource
-from modules.netbackup.client import create_client
-from runtime.executor import execute, validate_context
-from runtime.registry import SCOPES, SOURCES
-from scopes.logstash import LogstashScope
-from scopes.pamela import PamelaScope
+from exceptions import CollectionError, ConfigurationError, UnsupportedCollectionError
+from modules.netbackup import create_client
+from runtime import execute, validate_context
 from settings import Settings
 
 
@@ -28,15 +24,19 @@ class FakeClient:
 
 
 def test_unsupported_collection_is_rejected():
-    context = CollectionContext("datadomain", "jobs", "pamela")
-    with pytest.raises(UnsupportedCollectionError, match="source=datadomain"):
+    context = CollectionContext("netbackup", "images", "pamela")
+    with pytest.raises(UnsupportedCollectionError, match="data_type=images"):
         validate_context(context)
 
 
-def test_registry_selects_expected_source_and_scopes():
-    assert SOURCES["netbackup"] is NetBackupSource
-    assert SCOPES["pamela"] is PamelaScope
-    assert SCOPES["logstash"] is LogstashScope
+def test_datadomain_command_reaches_placeholder_module():
+    context = CollectionContext("datadomain", "future", "pamela")
+    with pytest.raises(CollectionError, match="not implemented"):
+        execute(context, settings=Settings())
+
+
+def test_supported_netbackup_command_is_accepted():
+    validate_context(CollectionContext("netbackup", "images", "logstash"))
 
 
 def test_file_output_override_avoids_http(tmp_path):

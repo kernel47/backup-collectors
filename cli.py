@@ -4,8 +4,8 @@ from typing import Sequence
 
 from context import CollectionContext
 from exceptions import BackupCollectorError
-from modules.icinga.handler import configure_logging, handle_error, handle_success
-from runtime.executor import execute
+from modules.icinga import configure_logging, handle_error, handle_success
+from runtime import execute
 from settings import Settings
 
 

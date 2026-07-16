@@ -1,7 +1,7 @@
 import json
 
 from context import CollectionContext
-from modules.output import OutputService
+from modules import output
 from settings import Settings
 
 
@@ -9,7 +9,7 @@ def test_file_output_is_atomic_and_has_metadata(tmp_path):
     context = CollectionContext(
         "netbackup", "policies", "pamela", asset="master-emea-01", output="file"
     )
-    count = OutputService(Settings(output_dir=tmp_path)).send([{"name": "daily"}], context)
+    count = output.send([{"name": "daily"}], context, Settings(output_dir=tmp_path))
     files = list(tmp_path.rglob("*.json"))
     assert count == 1
     assert len(files) == 1
@@ -32,11 +32,13 @@ def test_referential_output_is_selected_by_parameter(monkeypatch):
         sent["payload"] = kwargs["json"]
         return Response()
 
-    monkeypatch.setattr("modules.output.http.httpx.post", fake_post)
+    monkeypatch.setattr("modules.output.httpx.post", fake_post)
     context = CollectionContext("netbackup", "baseline", "baseline", output="referential")
-    count = OutputService(
-        Settings(referential_url="https://referential.example.test")
-    ).send([{"rule": "example"}], context)
+    count = output.send(
+        [{"rule": "example"}],
+        context,
+        Settings(referential_url="https://referential.example.test"),
+    )
     assert count == 1
     assert sent["url"] == "https://referential.example.test"
     assert sent["payload"]["metadata"]["destination"] == "referential"
@@ -54,10 +56,12 @@ def test_scope_selects_logstash_by_default(monkeypatch):
         sent["payload"] = kwargs["json"]
         return Response()
 
-    monkeypatch.setattr("modules.output.http.httpx.post", fake_post)
+    monkeypatch.setattr("modules.output.httpx.post", fake_post)
     context = CollectionContext("netbackup", "jobs", "logstash")
-    count = OutputService(Settings(logstash_url="https://logstash.example.test")).send(
-        [{"job_id": 42}], context
+    count = output.send(
+        [{"job_id": 42}],
+        context,
+        Settings(logstash_url="https://logstash.example.test"),
     )
     assert count == 1
     assert sent["url"] == "https://logstash.example.test"

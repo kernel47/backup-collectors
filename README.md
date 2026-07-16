@@ -1,58 +1,57 @@
 # Backup Collector
 
-Backup Collector est un noyau Python 3.12 destiné à être exécuté par Icinga sur une
-machine Sys Activity. Il collecte des données d'assets de sauvegarde, les transforme
-pour un besoin métier, puis les envoie à une destination technique.
+Backup Collector exécute une collecte depuis un asset de sauvegarde, parse les données
+selon un scope, puis les envoie vers une destination.
 
-Une collecte est définie par trois valeurs :
-
-- la **source** récupère les données de l'asset (`netbackup`) ;
-- le **data type** indique les données (`policies`, `jobs`, `images`, `shares`) ;
-- le **scope** choisit le parser et la destination par défaut
-  (`pamela`, `logstash`, `baseline`).
-
-La séparation reste volontairement directe :
+Le flux est volontairement explicite :
 
 ```text
-CLI -> Module de collecte -> Scope/Parser -> OutputService -> Destination
+cli.py
+  -> runtime.py
+  -> modules/netbackup.py ou modules/datadomain.py
+  -> scopes/pamela.py, scopes/logstash.py ou scopes/baseline.py
+  -> modules/output.py
+  -> Backup Hub, Logstash, Referential, fichier ou stdout
 ```
 
-Tout le comportement visible par Icinga est regroupé dans `modules/icinga/handler.py` :
-format des lignes `OK/WARNING/CRITICAL/UNKNOWN`, codes de retour et configuration du
-logging. Ce fichier peut être modifié seul pour adapter l'intégration Icinga.
+Il n'existe ni registre dynamique, ni découverte automatique, ni classe par petit
+composant. `runtime.py` contient les branchements lisibles qui sélectionnent la source,
+le parser et l'output.
 
-Les composants techniques partagés sont regroupés dans `modules/`. Les parsers restent
-dans leur scope métier. Il n'existe pas de composant ELK : le scope `logstash` prépare
-les événements et Logstash assure ensuite leur acheminement vers ELK.
+## Structure
 
 ```text
 modules/
-├── datadomain/
-├── icinga/
-├── netbackup/
-├── output/
-└── tapelibrary/
+├── netbackup.py     # client nbu et collectes policies/jobs/images/shares
+├── datadomain.py    # emplacement du futur collecteur Data Domain
+├── tapelibrary.py   # emplacement du futur collecteur Tape Library
+├── output.py        # sélection et envoi HTTP, fichier ou stdout
+└── icinga.py        # messages, logs et codes retour Icinga
 
 scopes/
-├── baseline/
-├── logstash/
-└── pamela/
+├── pamela.py        # parsing Pamela
+├── logstash.py      # parsing des événements envoyés à Logstash
+└── baseline.py      # règles et format Baseline
 ```
 
-NetBackup passe exclusivement par le package Python `nbu`, isolé derrière l'adaptateur
-`modules/netbackup/client.py`. Backup Collector lui transmet uniquement le hostname du master
-server ; `netbackup-py` reste responsable de retrouver sa configuration et ses secrets.
-Pamela envoie par défaut vers Backup Hub, le scope Logstash vers Logstash et Baseline
-vers le référentiel. `--output file` ou `--output stdout` permettent de tester sans
-appel HTTP.
+Les fichiers racine restent simples :
 
-## Installation et configuration
+- `cli.py` lit la commande et crée le contexte ;
+- `runtime.py` exécute le flux complet ;
+- `context.py` et `result.py` contiennent les dataclasses ;
+- `settings.py` lit les URLs et tokens des destinations ;
+- `exceptions.py` contient les erreurs applicatives.
+
+## Installation
 
 ```bash
 python -m pip install -e '.[dev]'
 ```
 
-Variables principales :
+Le module `netbackup-py` reçoit uniquement le hostname du master server. Il reste
+responsable de chercher sa configuration et ses secrets dans le référentiel.
+
+Variables disponibles pour les destinations :
 
 ```text
 BACKUP_HUB_URL, BACKUP_HUB_TOKEN
@@ -61,78 +60,69 @@ REFERENTIAL_URL, REFERENTIAL_TOKEN
 BACKUP_COLLECTOR_OUTPUT_DIR, BACKUP_COLLECTOR_LOG_LEVEL
 ```
 
-Backup Collector ne lit aucune variable de connexion NetBackup et ne stocke aucun mot
-de passe NetBackup. Le hostname du master server est fourni avec
-`--asset MASTER_SERVER`. Une sortie fichier n'exige aucune URL HTTP.
-
-## Exemples
+## Commandes
 
 ```bash
 backup-collector collect netbackup policies \
-  --scope pamela \
-  --asset master-emea-01
+  --asset master-emea-01 \
+  --scope pamela
 
 backup-collector collect netbackup jobs \
-  --scope pamela \
   --asset master-emea-01 \
+  --scope pamela \
   --hours 24
 
-backup-collector collect netbackup shares \
-  --scope logstash \
-  --asset master-emea-01
-
 backup-collector collect netbackup images \
-  --scope logstash \
   --asset master-emea-01 \
+  --scope logstash
+
+backup-collector collect netbackup shares \
+  --asset master-emea-01 \
+  --scope logstash \
   --output file
 
 backup-collector collect netbackup baseline \
-  --scope baseline \
   --asset master-emea-01 \
-  --output file
+  --scope baseline \
+  --output referential
 ```
 
-Pour une vérification sans écriture ni envoi, ajouter `--dry-run`. Pour afficher les
-événements sur stdout, utiliser `--output stdout`. Les fichiers JSON sont écrits de
-façon atomique sous :
+La route Data Domain existe déjà, mais son collecteur sera défini ultérieurement :
+
+```bash
+backup-collector collect datadomain future --asset dd-01 --scope pamela
+```
+
+## Outputs
+
+Sans `--output`, la destination dépend du scope :
+
+```text
+pamela    -> backup_hub
+logstash  -> logstash
+baseline  -> referential
+```
+
+Une commande peut surcharger cette destination avec :
+
+```text
+--output backup_hub
+--output logstash
+--output referential
+--output file
+--output stdout
+```
+
+`--output file` écrit atomiquement sous :
 
 ```text
 $BACKUP_COLLECTOR_OUTPUT_DIR/<scope>/<source>/<data_type>/
 ```
 
-## Extensions
-
-- **Nouvelle source** : créer une classe avec `collect(data_type, context)`, puis
-  l'ajouter à `runtime/registry.py`.
-- **Nouveau type de données** : ajouter un petit collecteur au dossier de la source,
-  son parser dans le scope et déclarer la combinaison supportée.
-- **Nouveau scope** : créer sa classe `execute` et ses fonctions de parsing, puis
-  l'inscrire dans `SCOPES` et dans les destinations par défaut d'`OutputService`.
-- **Nouvelle destination** : l'ajouter à `modules/output/service.py`. Le service choisit
-  ensuite HTTP, fichier ou stdout à partir de `--output` ou du scope.
-- **Nouveau module externe** : déclarer sa dépendance dans `pyproject.toml`, puis créer
-  un sous-dossier et un adaptateur minimal dans `modules/`. Les secrets restent gérés par le module
-  externe ou le référentiel, jamais par Backup Collector.
-
-Le connecteur `shares` est une adaptation temporaire documentée : le module `nbu`
-actuel ne possède pas encore de service shares, donc il expose pour l'instant les
-clients protégés retournés par `client.policies.clients()`.
-
-Baseline contient deux règles d'exemple (`EXAMPLE_*`) afin d'illustrer le workflow ;
-elles ne constituent pas encore un référentiel métier de production.
-
 ## Icinga
 
-Icinga peut appeler directement la commande installée. Elle produit une seule ligne :
-
-```text
-OK - scope=pamela source=netbackup data=policies collected=3200 parsed=3200 sent=3200 duration=42.3s
-```
-
-Codes de retour : `0 OK`, `1 WARNING`, `2 CRITICAL`, `3 UNKNOWN`.
-
-Pour changer le texte du contrôle, le niveau ou le format des logs, ou la conversion
-des statuts en codes retour, modifier uniquement `modules/icinga/handler.py`.
+`modules/icinga.py` est le seul fichier à modifier pour changer les messages, les logs
+ou les codes retour : `0 OK`, `1 WARNING`, `2 CRITICAL`, `3 UNKNOWN`.
 
 ## Tests
 
@@ -141,4 +131,5 @@ python -m pytest
 ruff check .
 ```
 
-Les tests utilisent des doubles du package `nbu` et ne contactent aucun service réel.
+Les tests n'effectuent aucun appel réel vers NetBackup ou une destination HTTP.
+

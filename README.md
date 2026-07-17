@@ -67,6 +67,17 @@ développement :
 python -m pip install -e '.[dev]'
 ```
 
+Une fois le venv activé, cette installation crée directement la commande :
+
+```bash
+backup-collector --help
+backup-collector collect netbackup policies --asset master-01 --scope pamela
+```
+
+Il n'est donc plus nécessaire d'utiliser `python cli.py`. Si la commande n'est pas
+trouvée, vérifier que le bon venv est actif avec `which python` et
+`which backup-collector`, puis relancer `python -m pip install -e .`.
+
 Créer ensuite la configuration locale à partir de l'exemple :
 
 ```bash
@@ -124,6 +135,11 @@ L'aide intégrée rappelle les paramètres disponibles et contient des exemples 
 backup-collector --help
 backup-collector collect --help
 ```
+
+Dans un terminal interactif, la commande affiche la progression de la résolution de
+l'asset, de la collecte, du parsing et de l'envoi. Utiliser `--no-progress` pour la
+masquer ou `--progress` pour la forcer dans un terminal non interactif. Le format
+Icinga reste automatiquement sur une seule ligne hors terminal.
 
 ```bash
 backup-collector collect netbackup policies \
@@ -186,6 +202,13 @@ $BACKUP_COLLECTOR_OUTPUT_DIR/<scope>/<source>/<data_type>/
 
 `services/icinga.py` est le seul fichier à modifier pour changer les messages, les logs
 ou les codes retour : `0 OK`, `1 WARNING`, `2 CRITICAL`, `3 UNKNOWN`.
+
+Chaque collecte terminée écrit aussi un log `INFO` avec le statut, le total collecté,
+le total parsé, le total envoyé et la durée. Pour l'afficher :
+
+```bash
+export BACKUP_COLLECTOR_LOG_LEVEL=INFO
+```
 
 ## Tests
 

@@ -18,7 +18,7 @@ def send(
     metadata: dict[str, Any] | None = None,
 ) -> int:
     """Send parsed records to the requested output or the scope default."""
-    destination = context.output or _default_destination(context.scope)
+    destination = destination_for(context)
     output_metadata = {
         "scope": context.scope,
         "source": context.source,
@@ -34,6 +34,10 @@ def send(
         print(json.dumps({"metadata": output_metadata, "records": records}, default=str))
         return len(records)
     return _send_http(records, destination, settings, output_metadata)
+
+
+def destination_for(context: CollectionContext) -> str:
+    return context.output or _default_destination(context.scope)
 
 
 def _default_destination(scope: str) -> str:

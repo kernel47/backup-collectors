@@ -61,10 +61,19 @@ def test_runtime_resolves_asset_hostname(monkeypatch):
 
     monkeypatch.setattr("runtime.referential.get_asset", fake_get_asset)
     settings = Settings()
-    result = execute(context, settings=settings, source_client=FakeClient())
+    events = []
+    result = execute(
+        context,
+        settings=settings,
+        source_client=FakeClient(),
+        progress=lambda event, **details: events.append((event, details)),
+    )
 
     assert calls == [("master-01", settings)]
     assert result.sent_count == 0
+    assert ("collection_started", {"data_type": "policies", "hostname": "master-01"}) in events
+    assert ("collection_finished", {"total": 1}) in events
+    assert events[-1] == ("dry_run", {})
 
 
 def test_nbu_package_client_is_used(monkeypatch):

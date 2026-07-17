@@ -1,4 +1,6 @@
-from services.icinga import handle_error, handle_success
+import logging
+
+from services.icinga import handle_error, handle_success, show_progress
 from models import CollectionContext, ExecutionResult
 
 
@@ -17,3 +19,19 @@ def test_error_is_kept_on_one_icinga_line(capsys):
     output = capsys.readouterr().out
     assert output.count("\n") == 1
     assert output.startswith("CRITICAL - scope=pamela")
+
+
+def test_progress_and_success_log_include_totals(capsys, caplog):
+    show_progress("collection_started", data_type="policies", hostname="master-01")
+    show_progress("collection_finished", total=12)
+    result = ExecutionResult("netbackup", "policies", "pamela", 12, 10, 10, "OK", 1.25)
+
+    with caplog.at_level(logging.INFO, logger="services.icinga"):
+        assert handle_success(result, pretty=True) == 0
+
+    output = capsys.readouterr().out
+    assert "Collecte policies sur le serveur master-01" in output
+    assert "12 élément(s) collecté(s)" in output
+    assert "Collectés : 12 | Parsés : 10 | Envoyés : 10" in output
+    assert "status=OK" in caplog.text
+    assert "total_collected=12" in caplog.text

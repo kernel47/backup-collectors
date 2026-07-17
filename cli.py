@@ -1,10 +1,11 @@
 import argparse
 from datetime import datetime
+import sys
 from typing import Sequence
 
 from exceptions import BackupCollectorError
 from models import CollectionContext, Settings
-from services.icinga import configure_logging, handle_error, handle_success
+from services.icinga import configure_logging, handle_error, handle_success, show_progress
 from runtime import execute
 
 CLI_EXAMPLES = """Exemples:
@@ -71,6 +72,12 @@ def create_parser() -> argparse.ArgumentParser:
         help="override the destination selected by the scope",
     )
     collect.add_argument("--dry-run", action="store_true", help="collect and parse without sending")
+    collect.add_argument(
+        "--progress",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="show progress (enabled automatically in an interactive terminal)",
+    )
     collect.add_argument("--verbose", action="store_true", help="enable debug logs")
     return parser
 
@@ -96,13 +103,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     settings = Settings.from_env()
     configure_logging(verbose=args.verbose, log_level=settings.log_level)
     context = context_from_args(args)
+    pretty = args.progress if args.progress is not None else sys.stdout.isatty()
     try:
-        result = execute(context, settings=settings)
+        result = execute(
+            context,
+            settings=settings,
+            progress=show_progress if pretty else None,
+        )
     except BackupCollectorError as exc:
         return handle_error(context, exc)
     except Exception as exc:  # defensive boundary for Icinga
         return handle_error(context, exc, unexpected=True)
-    return handle_success(result)
+    return handle_success(result, pretty=pretty)
 
 
 if __name__ == "__main__":

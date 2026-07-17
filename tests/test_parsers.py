@@ -27,6 +27,24 @@ def test_logstash_policy_parser_enriches_event():
     assert "@timestamp" in parsed[0]
 
 
+def test_pamela_client_parser_selects_expected_fields():
+    parsed = parse_pamela(
+        "clients",
+        [{"name": "client-01", "os": "Linux", "policies": ["daily"], "ignored": 1}],
+    )
+    assert parsed == [
+        {
+            "master": None,
+            "client_name": "client-01",
+            "os": "Linux",
+            "hardware": None,
+            "policies": ["daily"],
+            "active": None,
+            "last_backup_status": None,
+        }
+    ]
+
+
 def test_parser_service_selects_parser_from_scope():
     context = CollectionContext("netbackup", "policies", "pamela")
     parsed = parse_for_scope(context, [{"name": "daily"}], "master-01")

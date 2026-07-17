@@ -14,43 +14,66 @@ class FakePolicies:
         return [{"name": "daily", "policy_type": "Standard", "active": True}]
 
     def clients(self):
-        return []
+        return [{"name": "client-01", "os": "Linux", "policies": ["daily"]}]
+
+
+class FakeJobs:
+    def list(self, **kwargs):
+        return [{"job_id": 42, "client_name": "client-01", "status": 0}]
 
 
 class FakeClient:
     config = SimpleNamespace(master="master-01")
     policies = FakePolicies()
+    jobs = FakeJobs()
 
 
 def test_unsupported_collection_is_rejected():
-    context = CollectionContext("netbackup", "images", "pamela")
-    with pytest.raises(UnsupportedCollectionError, match="data_type=images"):
+    context = CollectionContext("datadomain", "workflow", "pamela")
+    with pytest.raises(UnsupportedCollectionError, match="source=datadomain scope=pamela"):
         validate_context(context)
 
 
 def test_datadomain_command_reaches_placeholder_module():
-    context = CollectionContext("datadomain", "future", "pamela")
+    context = CollectionContext("datadomain", "workflow", "baseline")
     with pytest.raises(CollectionError, match="not implemented"):
         execute(context, settings=Settings())
 
 
 def test_supported_netbackup_command_is_accepted():
-    validate_context(CollectionContext("netbackup", "images", "logstash"))
+    validate_context(CollectionContext("netbackup", "workflow", "logstash"))
 
 
 def test_file_output_override_avoids_http(tmp_path):
-    context = CollectionContext("netbackup", "policies", "pamela", output="file")
+    context = CollectionContext("netbackup", "workflow", "pamela", output="file")
     settings = Settings(output_dir=tmp_path)
     result = execute(context, settings=settings, source_client=FakeClient())
-    assert result.sent_count == 1
+    assert result.sent_count == 3
     files = list(tmp_path.rglob("*.json"))
-    assert len(files) == 1
-    assert '"asset": "master-01"' in files[0].read_text()
+    assert len(files) == 3
+    assert all('"asset": "master-01"' in file.read_text() for file in files)
+
+
+def test_pamela_sends_each_collection_before_the_next(monkeypatch):
+    context = CollectionContext("netbackup", "workflow", "pamela")
+    sent_types = []
+
+    def fake_send(records, step_context, settings, **kwargs):
+        sent_types.append(step_context.data_type)
+        return len(records)
+
+    monkeypatch.setattr("runtime.output.send", fake_send)
+    result = execute(context, settings=Settings(), source_client=FakeClient())
+
+    assert sent_types == ["policies", "clients", "jobs"]
+    assert result.collected_count == 3
+    assert result.parsed_count == 3
+    assert result.sent_count == 3
 
 
 def test_runtime_resolves_asset_hostname(monkeypatch):
     context = CollectionContext(
-        "netbackup", "policies", "pamela", asset="master-01", dry_run=True
+        "netbackup", "workflow", "pamela", asset="master-01", dry_run=True
     )
     resolved = Asset(hostname="master-01", api=True)
     calls = []
@@ -72,7 +95,13 @@ def test_runtime_resolves_asset_hostname(monkeypatch):
     assert calls == [("master-01", settings)]
     assert result.sent_count == 0
     assert ("collection_started", {"data_type": "policies", "hostname": "master-01"}) in events
-    assert ("collection_finished", {"total": 1}) in events
+    assert ("collection_finished", {"data_type": "policies", "total": 1}) in events
+    assert [details["data_type"] for event, details in events if event == "collection_started"] == [
+        "policies",
+        "clients",
+        "jobs",
+    ]
+    assert result.collected_count == 3
     assert events[-1] == ("dry_run", {})
 
 

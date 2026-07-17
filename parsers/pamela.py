@@ -25,5 +25,17 @@ def parse(data_type: str, records: list[dict]) -> list[dict]:
             }
             for record in records
         ]
+    if data_type == "clients":
+        return [
+            {
+                "master": record.get("master") or record.get("asset"),
+                "client_name": record.get("client_name") or record.get("name"),
+                "os": record.get("os"),
+                "hardware": record.get("hardware"),
+                "policies": record.get("policies", []),
+                "active": record.get("active"),
+                "last_backup_status": record.get("last_backup_status"),
+            }
+            for record in records
+        ]
     raise ParsingError(f"Pamela does not support data type: {data_type}")
-

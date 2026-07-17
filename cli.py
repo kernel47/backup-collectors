@@ -9,11 +9,10 @@ from services.icinga import configure_logging, handle_error, handle_success, sho
 from runtime import execute
 
 CLI_EXAMPLES = """Exemples:
-  backup-collector collect netbackup policies --asset master-01 --scope pamela
-  backup-collector collect netbackup jobs --asset master-01 --scope pamela --hours 24
-  backup-collector collect netbackup images --asset master-01 --scope logstash
-  backup-collector collect netbackup shares --asset master-01 --scope logstash --output file
-  backup-collector collect netbackup baseline --asset master-01 --scope baseline
+  backup-collector collect netbackup --asset master-01 --scope pamela --hours 24
+  backup-collector collect netbackup --asset master-01 --scope logstash --hours 24
+  backup-collector collect netbackup --asset master-01 --scope baseline
+  backup-collector collect datadomain --asset dd-01 --scope baseline
 """
 
 
@@ -35,7 +34,7 @@ def create_parser() -> argparse.ArgumentParser:
     collect = subparsers.add_parser(
         "collect",
         help="run a collection pipeline",
-        description="Collect a data type from an asset, parse it by scope, then send it.",
+        description="Run the source workflow selected by the scope for one asset.",
         epilog=CLI_EXAMPLES,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -44,12 +43,11 @@ def create_parser() -> argparse.ArgumentParser:
         choices=["netbackup", "datadomain", "tapelibrary"],
         help="asset collector to use",
     )
-    collect.add_argument("data_type", help="policies, jobs, images, shares or baseline")
     collect.add_argument(
         "--scope",
         required=True,
         choices=["pamela", "logstash", "baseline"],
-        help="parser and default destination",
+        help="collection workflow, parser and default destination",
     )
 
     assets = collect.add_mutually_exclusive_group()
@@ -85,7 +83,7 @@ def create_parser() -> argparse.ArgumentParser:
 def context_from_args(args: argparse.Namespace) -> CollectionContext:
     return CollectionContext(
         source=args.source,
-        data_type=args.data_type,
+        data_type="workflow",
         scope=args.scope,
         asset=args.asset,
         all_assets=args.all_assets,

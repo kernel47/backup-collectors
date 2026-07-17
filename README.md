@@ -3,6 +3,9 @@
 Backup Collector exécute une collecte depuis un asset de sauvegarde, parse les données
 selon un scope, puis les envoie vers une destination.
 
+Le scope choisit une séquence complète. Chaque type de données est collecté, parsé et
+envoyé avant de passer au suivant afin de limiter la mémoire utilisée.
+
 Le flux est volontairement explicite :
 
 ```text
@@ -28,7 +31,7 @@ modules/
 └── netbackup.py     # wrapper du package externe netbackup-py / nbu
 
 collectors/
-├── netbackup.py     # collectes policies, jobs, images et shares
+├── netbackup.py     # collectes policies, clients, jobs et images
 ├── datadomain.py    # futur collecteur Data Domain
 └── tapelibrary.py   # futur collecteur Tape Library
 
@@ -71,7 +74,7 @@ Une fois le venv activé, cette installation crée directement la commande :
 
 ```bash
 backup-collector --help
-backup-collector collect netbackup policies --asset master-01 --scope pamela
+backup-collector collect netbackup --asset master-01 --scope pamela
 ```
 
 Il n'est donc plus nécessaire d'utiliser `python cli.py`. Si la commande n'est pas
@@ -142,34 +145,44 @@ masquer ou `--progress` pour la forcer dans un terminal non interactif. Le forma
 Icinga reste automatiquement sur une seule ligne hors terminal.
 
 ```bash
-backup-collector collect netbackup policies \
+backup-collector collect netbackup \
   --asset master-emea-01 \
   --scope pamela
 
-backup-collector collect netbackup jobs \
+backup-collector collect netbackup \
   --asset master-emea-01 \
   --scope pamela \
   --hours 24
 
-backup-collector collect netbackup images \
+backup-collector collect netbackup \
   --asset master-emea-01 \
   --scope logstash
 
-backup-collector collect netbackup shares \
-  --asset master-emea-01 \
-  --scope logstash \
-  --output file
-
-backup-collector collect netbackup baseline \
+backup-collector collect netbackup \
   --asset master-emea-01 \
   --scope baseline \
   --output referential
 ```
 
-La route Data Domain existe déjà, mais son collecteur sera défini ultérieurement :
+Les workflows sont explicites :
+
+```text
+pamela + netbackup   : policies -> clients -> jobs       -> Backup Hub
+logstash + netbackup : jobs -> policies -> images        -> Logstash
+baseline + netbackup : policies                          -> Referential
+```
+
+Par exemple, Pamela envoie les policies avant de commencer les clients, puis envoie
+les clients avant de collecter les jobs. Les listes des étapes précédentes ne sont donc
+pas conservées pendant la collecte suivante. Les totaux sont cumulés pour le résumé
+final.
+
+Les routes Baseline Data Domain et Tape Library existent déjà, mais leurs collecteurs
+seront définis ultérieurement :
 
 ```bash
-backup-collector collect datadomain future --asset dd-01 --scope pamela
+backup-collector collect datadomain --asset dd-01 --scope baseline
+backup-collector collect tapelibrary --asset tl-01 --scope baseline
 ```
 
 ## Outputs

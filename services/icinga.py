@@ -13,11 +13,17 @@ PROGRESS_MESSAGES = {
     "collection_started": lambda data: (
         f"Collecte {data['data_type']} sur le serveur {data['hostname']}"
     ),
-    "collection_finished": lambda data: f"{data['total']} élément(s) collecté(s)",
-    "parsing_started": lambda data: f"Parsing pour le scope {data['scope']}",
-    "parsing_finished": lambda data: f"{data['total']} élément(s) parsé(s)",
-    "output_started": lambda data: f"Envoi vers {data['destination']}",
-    "output_finished": lambda data: f"{data['total']} élément(s) envoyé(s)",
+    "collection_finished": lambda data: (
+        f"{data['total']} {data['data_type']} collecté(s)"
+    ),
+    "parsing_started": lambda data: (
+        f"Parsing {data['data_type']} pour le scope {data['scope']}"
+    ),
+    "parsing_finished": lambda data: f"{data['total']} {data['data_type']} parsé(s)",
+    "output_started": lambda data: (
+        f"Envoi {data['data_type']} vers {data['destination']}"
+    ),
+    "output_finished": lambda data: f"{data['total']} {data['data_type']} envoyé(s)",
     "dry_run": lambda data: "Mode dry-run : aucun envoi",
 }
 

@@ -23,7 +23,7 @@ def test_error_is_kept_on_one_icinga_line(capsys):
 
 def test_progress_and_success_log_include_totals(capsys, caplog):
     show_progress("collection_started", data_type="policies", hostname="master-01")
-    show_progress("collection_finished", total=12)
+    show_progress("collection_finished", data_type="policies", total=12)
     result = ExecutionResult("netbackup", "policies", "pamela", 12, 10, 10, "OK", 1.25)
 
     with caplog.at_level(logging.INFO, logger="services.icinga"):
@@ -31,7 +31,7 @@ def test_progress_and_success_log_include_totals(capsys, caplog):
 
     output = capsys.readouterr().out
     assert "Collecte policies sur le serveur master-01" in output
-    assert "12 élément(s) collecté(s)" in output
+    assert "12 policies collecté(s)" in output
     assert "Collectés : 12 | Parsés : 10 | Envoyés : 10" in output
     assert "status=OK" in caplog.text
     assert "total_collected=12" in caplog.text

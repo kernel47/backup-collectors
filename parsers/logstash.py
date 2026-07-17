@@ -8,7 +8,7 @@ def parse(
     records: list[dict],
     asset: str | None = None,
 ) -> list[dict]:
-    if data_type not in {"policies", "jobs", "images", "shares"}:
+    if data_type not in {"policies", "jobs", "images", "clients"}:
         raise ParsingError(f"Logstash does not support data type: {data_type}")
 
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -31,4 +31,3 @@ def parse(
             }
         )
     return parsed
-

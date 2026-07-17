@@ -39,8 +39,8 @@ def test_collect_policies_through_nbu_service():
     assert result.records == [{"value": {"include_details": True}}]
 
 
-def test_shares_temporary_adapter_uses_policy_clients():
+def test_clients_collection_uses_policy_clients():
     result = collect(
-        "shares", CollectionContext("netbackup", "shares", "logstash"), client()
+        "clients", CollectionContext("netbackup", "clients", "pamela"), client()
     )
     assert result.records == [{"value": "client-01"}]

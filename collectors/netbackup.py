@@ -27,8 +27,7 @@ def collect(
                 items = client.jobs.list(**_date_parameters(context))
             elif data_type == "images":
                 items = client.images.list(**_date_parameters(context))
-            elif data_type == "shares":
-                # Temporary adapter until netbackup-py exposes a shares service.
+            elif data_type == "clients":
                 items = client.policies.clients()
             else:
                 raise CollectionError(f"Unsupported NetBackup data type: {data_type}")

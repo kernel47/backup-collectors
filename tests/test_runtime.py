@@ -58,11 +58,11 @@ def test_pamela_sends_each_collection_before_the_next(monkeypatch):
     context = CollectionContext("netbackup", "workflow", "pamela")
     sent_types = []
 
-    def fake_send(records, step_context, settings, **kwargs):
+    def fake_send(records, step_context, settings, asset):
         sent_types.append(step_context.data_type)
         return len(records)
 
-    monkeypatch.setattr("runtime.output.send", fake_send)
+    monkeypatch.setattr("collectors.pamela.output.send", fake_send)
     result = execute(context, settings=Settings(), source_client=FakeClient())
 
     assert sent_types == ["policies", "clients", "jobs"]

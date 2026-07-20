@@ -1,7 +1,6 @@
-from models import CollectionContext
-from parsers.logstash import parse as parse_logstash
-from parsers.pamela import parse as parse_pamela
-from parsers.service import parse_for_scope
+from collectors.baseline.parser import parse as parse_baseline
+from collectors.logstash.parser import parse as parse_logstash
+from collectors.pamela.parser import parse as parse_pamela
 
 
 def test_pamela_policy_parser_selects_expected_fields():
@@ -45,7 +44,6 @@ def test_pamela_client_parser_selects_expected_fields():
     ]
 
 
-def test_parser_service_selects_parser_from_scope():
-    context = CollectionContext("netbackup", "policies", "pamela")
-    parsed = parse_for_scope(context, [{"name": "daily"}], "master-01")
-    assert parsed[0]["policy_name"] == "daily"
+def test_baseline_policy_parser_creates_finding():
+    parsed = parse_baseline("policies", [{"name": "daily", "clients": []}])
+    assert parsed[0]["rule"] == "EXAMPLE_POLICY_WITHOUT_CLIENT"

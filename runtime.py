@@ -1,35 +1,30 @@
-from dataclasses import replace
 from time import monotonic
 from typing import Any, Callable
 
-from collectors import datadomain, netbackup, tapelibrary
+from collectors.baseline import collector as baseline
+from collectors.logstash import collector as logstash
+from collectors.pamela import collector as pamela
 from exceptions import UnsupportedCollectionError
-from models import Asset, CollectionContext, CollectionResult, ExecutionResult, Settings
-from parsers.service import parse_for_scope
-from services import output, referential
+from models import Asset, CollectionContext, ExecutionResult, ScopeResult, Settings
+from services import referential
 
 ProgressCallback = Callable[..., None]
 
-WORKFLOWS = {
-    ("netbackup", "pamela"): ("policies", "clients", "jobs"),
-    ("netbackup", "logstash"): ("jobs", "policies", "images"),
-    ("netbackup", "baseline"): ("policies",),
-    ("datadomain", "baseline"): ("baseline",),
-    ("tapelibrary", "baseline"): ("baseline",),
-}
 
-
-def workflow_for(context: CollectionContext) -> tuple[str, ...]:
-    workflow = WORKFLOWS.get((context.source, context.scope))
-    if workflow:
-        return workflow
+def validate_context(context: CollectionContext) -> None:
+    if context.scope == "pamela" and context.source == "netbackup":
+        return
+    if context.scope == "logstash" and context.source == "netbackup":
+        return
+    if context.scope == "baseline" and context.source in {
+        "netbackup",
+        "datadomain",
+        "tapelibrary",
+    }:
+        return
     raise UnsupportedCollectionError(
         f"Unsupported workflow: source={context.source} scope={context.scope}"
     )
-
-
-def validate_context(context: CollectionContext) -> None:
-    workflow_for(context)
 
 
 def execute(
@@ -38,92 +33,41 @@ def execute(
     source_client: Any = None,
     progress: ProgressCallback | None = None,
 ) -> ExecutionResult:
-    workflow = workflow_for(context)
+    validate_context(context)
     settings = settings or Settings.from_env()
     started = monotonic()
 
+    asset = None
     if context.asset:
         _progress(progress, "asset_lookup_started", hostname=context.asset)
         asset = referential.get_asset(context.asset, settings)
         _progress(progress, "asset_lookup_finished", hostname=asset.hostname)
-    else:
-        asset = None
 
-    collected_total = 0
-    parsed_total = 0
-    sent_total = 0
-
-    for data_type in workflow:
-        step_context = replace(context, data_type=data_type)
-        hostname = asset.hostname if asset else context.asset
-        _progress(
-            progress,
-            "collection_started",
-            data_type=data_type,
-            hostname=hostname,
-        )
-        collected = _collect(step_context, source_client, asset)
-        collected_total += collected.record_count
-        _progress(
-            progress,
-            "collection_finished",
-            data_type=data_type,
-            total=collected.record_count,
-        )
-
-        _progress(progress, "parsing_started", data_type=data_type, scope=context.scope)
-        parsed = parse_for_scope(step_context, collected.records, collected.asset)
-        parsed_total += len(parsed)
-        _progress(progress, "parsing_finished", data_type=data_type, total=len(parsed))
-
-        if not context.dry_run:
-            destination = output.destination_for(step_context)
-            _progress(
-                progress,
-                "output_started",
-                data_type=data_type,
-                destination=destination,
-            )
-            metadata = {"workflow": "baseline"} if context.scope == "baseline" else None
-            sent = output.send(
-                parsed,
-                step_context,
-                settings,
-                asset=collected.asset,
-                metadata=metadata,
-            )
-            sent_total += sent
-            _progress(progress, "output_finished", data_type=data_type, total=sent)
-
-        # Only totals survive this iteration; the next collection does not retain
-        # records from the previous one.
-        del collected, parsed
-
-    if context.dry_run:
-        _progress(progress, "dry_run")
-
+    scope_result = _run_scope(context, settings, asset, source_client, progress)
     return ExecutionResult(
         source=context.source,
         data_type="workflow",
         scope=context.scope,
-        collected_count=collected_total,
-        parsed_count=parsed_total,
-        sent_count=sent_total,
+        collected_count=scope_result.collected_count,
+        parsed_count=scope_result.parsed_count,
+        sent_count=scope_result.sent_count,
         status="OK",
         duration_seconds=monotonic() - started,
     )
 
 
-def _collect(
+def _run_scope(
     context: CollectionContext,
-    source_client: Any,
+    settings: Settings,
     asset: Asset | None,
-) -> CollectionResult:
-    if context.source == "netbackup":
-        return netbackup.collect(context.data_type, context, source_client, asset)
-    if context.source == "datadomain":
-        return datadomain.collect(context.data_type, context, asset)
-    return tapelibrary.collect(context.data_type, context, asset)
+    source_client: Any,
+    progress: ProgressCallback | None,
+) -> ScopeResult:
+    if context.scope == "pamela":
+        return pamela.collect(context, settings, asset, source_client, progress)
+    if context.scope == "logstash":
+        return logstash.collect(context, settings, asset, source_client, progress)
+    return baseline.collect(context, settings, asset, source_client, progress)
 
 
 def _progress(callback: ProgressCallback | None, event: str, **details: Any) -> None:

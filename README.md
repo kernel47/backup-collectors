@@ -12,17 +12,18 @@ Le flux est volontairement explicite :
 cli.py
   -> runtime.py
   -> services/referential.py pour résoudre le hostname en objet Asset
-  -> collectors/netbackup.py ou collectors/datadomain.py
+  -> collectors/<scope>/collector.py
+  -> collectors/netbackup.py, datadomain.py ou tapelibrary.py
   -> modules/netbackup.py pour accéder au package externe nbu
-  -> parsers/service.py
-  -> parsers/pamela.py, parsers/logstash.py ou parsers/baseline.py
+  -> collectors/<scope>/parser.py
+  -> collectors/<scope>/output.py
   -> services/output.py
   -> Backup Hub, Logstash, Referential, fichier ou stdout
 ```
 
 Il n'existe ni registre dynamique, ni découverte automatique, ni classe par petit
-composant. `runtime.py` contient les branchements lisibles qui sélectionnent la source,
-le parser et l'output.
+composant. `runtime.py` contient uniquement les branchements lisibles qui sélectionnent
+le scope. Chaque scope reste autonome pour ses collectes, son traitement et sa sortie.
 
 ## Structure
 
@@ -31,15 +32,21 @@ modules/
 └── netbackup.py     # wrapper du package externe netbackup-py / nbu
 
 collectors/
-├── netbackup.py     # collectes policies, clients, jobs et images
-├── datadomain.py    # futur collecteur Data Domain
-└── tapelibrary.py   # futur collecteur Tape Library
-
-parsers/
-├── pamela.py        # parsing Pamela
-├── logstash.py      # parsing des événements envoyés à Logstash
-├── baseline.py      # règles et format Baseline
-└── service.py       # sélection explicite du parser selon le scope
+├── netbackup.py             # accès technique à la source NetBackup
+├── datadomain.py            # futur accès technique à Data Domain
+├── tapelibrary.py           # futur accès technique à Tape Library
+├── pamela/
+│   ├── collector.py         # séquence policies -> clients -> jobs
+│   ├── parser.py            # traitement et filtres Pamela
+│   └── output.py            # destination Backup Hub
+├── logstash/
+│   ├── collector.py         # séquence jobs -> policies -> images
+│   ├── parser.py            # format des événements Logstash
+│   └── output.py            # destination Logstash
+└── baseline/
+    ├── collector.py         # séquence propre à chaque source
+    ├── parser.py            # règles Baseline
+    └── output.py            # destination Referential
 
 services/
 ├── referential.py   # recherche d'un asset à partir de son hostname
@@ -50,7 +57,7 @@ services/
 Les fichiers racine restent simples :
 
 - `cli.py` définit les arguments, crée le contexte et lance la commande ;
-- `runtime.py` exécute le flux complet ;
+- `runtime.py` résout l'asset et transmet l'exécution au collecteur du scope ;
 - `models.py` contient toutes les dataclasses, y compris le contexte, les résultats et
   les réglages des destinations ;
 - `exceptions.py` contient les erreurs applicatives.
@@ -176,6 +183,10 @@ Par exemple, Pamela envoie les policies avant de commencer les clients, puis env
 les clients avant de collecter les jobs. Les listes des étapes précédentes ne sont donc
 pas conservées pendant la collecte suivante. Les totaux sont cumulés pour le résumé
 final.
+
+Pour ajouter ou modifier un besoin futur propre à Pamela, Baseline ou Logstash, les
+changements restent dans le dossier du scope concerné. Les collecteurs techniques de
+source et les services génériques ne changent que si leur protocole évolue.
 
 Les routes Baseline Data Domain et Tape Library existent déjà, mais leurs collecteurs
 seront définis ultérieurement :

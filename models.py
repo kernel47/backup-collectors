@@ -67,6 +67,13 @@ class ExecutionResult:
 
 
 @dataclass
+class ScopeResult:
+    collected_count: int = 0
+    parsed_count: int = 0
+    sent_count: int = 0
+
+
+@dataclass
 class Settings:
     backup_hub_url: str | None = None
     backup_hub_token: str | None = None

@@ -1,0 +1,1 @@
+"""Pamela collection scope."""

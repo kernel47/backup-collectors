@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
 
 
-def parse(records: list[dict]) -> list[dict]:
-    """Apply the initial example baseline rules to NetBackup policies."""
+def parse(data_type: str, records: list[dict]) -> list[dict]:
+    if data_type != "policies":
+        return records
+
     evaluated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     findings = []
     for policy in records:
@@ -26,4 +28,3 @@ def parse(records: list[dict]) -> list[dict]:
                 }
             )
     return findings
-

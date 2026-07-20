@@ -2,7 +2,7 @@
 
 import logging
 
-from models import CollectionContext, ExecutionResult
+from models import CollectionContext, ExecutionResult, ScopeResult
 
 EXIT_CODES = {"OK": 0, "WARNING": 1, "CRITICAL": 2, "UNKNOWN": 3}
 LOGGER = logging.getLogger(__name__)
@@ -49,15 +49,38 @@ def show_progress(event: str, **details: object) -> None:
     print(f"  {icon} {message_builder(details)}", flush=True)
 
 
+def log_collection(
+    scope: str,
+    source: str,
+    data_type: str,
+    collected: int,
+    parsed: int,
+    sent: int,
+) -> None:
+    LOGGER.info(
+        "collection status=OK scope=%s source=%s data=%s collected=%d parsed=%d sent=%d",
+        scope,
+        source,
+        data_type,
+        collected,
+        parsed,
+        sent,
+    )
+
+
+def log_scope_result(scope: str, source: str, result: ScopeResult) -> None:
+    LOGGER.info(
+        "scope_report status=OK scope=%s source=%s collected=%d parsed=%d sent=%d",
+        scope,
+        source,
+        result.collected_count,
+        result.parsed_count,
+        result.sent_count,
+    )
+
+
 def handle_success(result: ExecutionResult, *, pretty: bool = False) -> int:
     status = result.status if result.status in EXIT_CODES else "UNKNOWN"
-    log_summary = (
-        f"status={status} scope={result.scope} source={result.source} "
-        f"data={result.data_type} total_collected={result.collected_count} "
-        f"total_parsed={result.parsed_count} total_sent={result.sent_count} "
-        f"duration_seconds={result.duration_seconds:.1f}"
-    )
-    LOGGER.info("collection_finished %s", log_summary)
     if pretty:
         print(
             f"\n✓ Collecte terminée — {status}\n"
@@ -68,7 +91,7 @@ def handle_success(result: ExecutionResult, *, pretty: bool = False) -> int:
     else:
         print(
             f"{status} - scope={result.scope} source={result.source} "
-            f"data={result.data_type} collected={result.collected_count} "
+            f"collected={result.collected_count} "
             f"parsed={result.parsed_count} sent={result.sent_count} "
             f"duration={result.duration_seconds:.1f}s"
         )
@@ -87,6 +110,6 @@ def handle_error(
     message = str(error).replace("\n", " ").replace('"', "'")
     print(
         f"{status} - scope={context.scope} source={context.source} "
-        f'data={context.data_type} error="{message}"'
+        f'error="{message}"'
     )
     return EXIT_CODES[status]

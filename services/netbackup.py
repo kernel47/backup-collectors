@@ -1,34 +1,29 @@
-from datetime import UTC, datetime
 from typing import Any
 
-from exceptions import CollectionError
+from exceptions import CollectionError, ConfigurationError
 from models import Asset, CollectionContext, CollectionResult
-from modules.netbackup import create_client
 
 
 def collect(
     data_type: str,
     context: CollectionContext,
+    asset: Asset,
     client: Any = None,
-    asset: Asset | None = None,
 ) -> CollectionResult:
-    """Collect one NetBackup data type with explicit, easy-to-follow branches."""
     owns_client = client is None
     if client is None:
-        if asset is None:
-            raise CollectionError("NetBackup asset was not resolved by the referential")
         client = create_client(asset)
-    started_at = datetime.now(UTC)
+
     try:
         try:
             if data_type == "policies":
                 items = client.policies.list(include_details=True)
+            elif data_type == "clients":
+                items = client.policies.clients()
             elif data_type == "jobs":
                 items = client.jobs.list(**_date_parameters(context))
             elif data_type == "images":
                 items = client.images.list(**_date_parameters(context))
-            elif data_type == "clients":
-                items = client.policies.clients()
             else:
                 raise CollectionError(f"Unsupported NetBackup data type: {data_type}")
             records = [_as_dict(item) for item in items]
@@ -37,22 +32,27 @@ def collect(
         except Exception as exc:
             raise CollectionError(f"NetBackup {data_type} collection failed: {exc}") from exc
 
-        hostname = (
-            asset.hostname
-            if asset
-            else context.asset or getattr(getattr(client, "config", None), "master", "unknown")
-        )
-        return CollectionResult(
-            source="netbackup",
-            data_type=data_type,
-            asset=hostname,
-            records=records,
-            started_at=started_at,
-            finished_at=datetime.now(UTC),
-        )
+        return CollectionResult(asset=asset.hostname, records=records)
     finally:
         if owns_client and hasattr(client, "close"):
             client.close()
+
+
+def create_client(asset: Asset) -> Any:
+    if not asset.api:
+        raise ConfigurationError(f"NetBackup API is disabled for hostname={asset.hostname}")
+    try:
+        from nbu import NetBackup
+    except ImportError as exc:
+        raise ConfigurationError("The netbackup-py package is not installed") from exc
+    return NetBackup(
+        master=asset.hostname,
+        username=asset.api_username,
+        password=asset.api_password,
+        domain_type=asset.domain_type,
+        domain_name=asset.domain_name,
+        version=asset.version,
+    )
 
 
 def _date_parameters(context: CollectionContext) -> dict[str, Any]:

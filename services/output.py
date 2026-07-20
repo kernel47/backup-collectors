@@ -14,6 +14,7 @@ def send(
     context: CollectionContext,
     settings: Settings,
     *,
+    data_type: str,
     asset: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> int:
@@ -22,14 +23,14 @@ def send(
     output_metadata = {
         "scope": context.scope,
         "source": context.source,
-        "data_type": context.data_type,
+        "data_type": data_type,
         "asset": asset or context.asset,
         "destination": destination,
         **(metadata or {}),
     }
 
     if destination == "file":
-        return _send_file(records, context, settings, output_metadata)
+        return _send_file(records, context, settings, data_type, output_metadata)
     if destination == "stdout":
         print(json.dumps({"metadata": output_metadata, "records": records}, default=str))
         return len(records)
@@ -89,11 +90,12 @@ def _send_file(
     records: list[dict],
     context: CollectionContext,
     settings: Settings,
+    data_type: str,
     metadata: dict[str, Any],
 ) -> int:
     now = datetime.now(UTC)
-    directory = settings.output_dir / context.scope / context.source / context.data_type
-    final_path = directory / f"{context.data_type}_{now.strftime('%Y%m%dT%H%M%SZ')}.json"
+    directory = settings.output_dir / context.scope / context.source / data_type
+    final_path = directory / f"{data_type}_{now.strftime('%Y%m%dT%H%M%SZ')}.json"
     temporary_path = final_path.with_suffix(".json.tmp")
     document_metadata = {
         "record_count": len(records),

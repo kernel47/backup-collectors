@@ -6,9 +6,14 @@ from services import output
 
 def test_file_output_is_atomic_and_has_metadata(tmp_path):
     context = CollectionContext(
-        "netbackup", "policies", "pamela", asset="master-emea-01", output="file"
+        "netbackup", "pamela", "master-emea-01", output="file"
     )
-    count = output.send([{"name": "daily"}], context, Settings(output_dir=tmp_path))
+    count = output.send(
+        [{"name": "daily"}],
+        context,
+        Settings(output_dir=tmp_path),
+        data_type="policies",
+    )
     files = list(tmp_path.rglob("*.json"))
     assert count == 1
     assert len(files) == 1
@@ -32,11 +37,12 @@ def test_referential_output_is_selected_by_parameter(monkeypatch):
         return Response()
 
     monkeypatch.setattr("services.output.httpx.post", fake_post)
-    context = CollectionContext("netbackup", "baseline", "baseline", output="referential")
+    context = CollectionContext("netbackup", "baseline", "master-01", output="referential")
     count = output.send(
         [{"rule": "example"}],
         context,
         Settings(referential_url="https://referential.example.test"),
+        data_type="policies",
     )
     assert count == 1
     assert sent["url"] == "https://referential.example.test"
@@ -56,11 +62,12 @@ def test_scope_selects_logstash_by_default(monkeypatch):
         return Response()
 
     monkeypatch.setattr("services.output.httpx.post", fake_post)
-    context = CollectionContext("netbackup", "jobs", "logstash")
+    context = CollectionContext("netbackup", "logstash", "master-01")
     count = output.send(
         [{"job_id": 42}],
         context,
         Settings(logstash_url="https://logstash.example.test"),
+        data_type="jobs",
     )
     assert count == 1
     assert sent["url"] == "https://logstash.example.test"

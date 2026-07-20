@@ -1,14 +1,11 @@
 from time import monotonic
-from typing import Any, Callable
 
 from collectors.baseline import collector as baseline
 from collectors.logstash import collector as logstash
 from collectors.pamela import collector as pamela
 from exceptions import UnsupportedCollectionError
 from models import Asset, CollectionContext, ExecutionResult, ScopeResult, Settings
-from services import referential
-
-ProgressCallback = Callable[..., None]
+from services import icinga, referential
 
 
 def validate_context(context: CollectionContext) -> None:
@@ -30,23 +27,16 @@ def validate_context(context: CollectionContext) -> None:
 def execute(
     context: CollectionContext,
     settings: Settings | None = None,
-    source_client: Any = None,
-    progress: ProgressCallback | None = None,
+    show_progress: bool = False,
 ) -> ExecutionResult:
     validate_context(context)
     settings = settings or Settings.from_env()
     started = monotonic()
 
-    asset = None
-    if context.asset:
-        _progress(progress, "asset_lookup_started", hostname=context.asset)
-        asset = referential.get_asset(context.asset, settings)
-        _progress(progress, "asset_lookup_finished", hostname=asset.hostname)
-
-    scope_result = _run_scope(context, settings, asset, source_client, progress)
+    asset = _resolve_asset(context, settings, show_progress)
+    scope_result = _run_scope(context, settings, asset, show_progress)
     return ExecutionResult(
         source=context.source,
-        data_type="workflow",
         scope=context.scope,
         collected_count=scope_result.collected_count,
         parsed_count=scope_result.parsed_count,
@@ -56,20 +46,27 @@ def execute(
     )
 
 
+def _resolve_asset(
+    context: CollectionContext,
+    settings: Settings,
+    show_progress: bool,
+) -> Asset:
+    if show_progress:
+        icinga.show_progress("asset_lookup_started", hostname=context.asset)
+    asset = referential.get_asset(context.asset, settings)
+    if show_progress:
+        icinga.show_progress("asset_lookup_finished", hostname=asset.hostname)
+    return asset
+
+
 def _run_scope(
     context: CollectionContext,
     settings: Settings,
-    asset: Asset | None,
-    source_client: Any,
-    progress: ProgressCallback | None,
+    asset: Asset,
+    show_progress: bool,
 ) -> ScopeResult:
     if context.scope == "pamela":
-        return pamela.collect(context, settings, asset, source_client, progress)
+        return pamela.collect(context, settings, asset, show_progress)
     if context.scope == "logstash":
-        return logstash.collect(context, settings, asset, source_client, progress)
-    return baseline.collect(context, settings, asset, source_client, progress)
-
-
-def _progress(callback: ProgressCallback | None, event: str, **details: Any) -> None:
-    if callback:
-        callback(event, **details)
+        return logstash.collect(context, settings, asset, show_progress)
+    return baseline.collect(context, settings, asset, show_progress)

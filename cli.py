@@ -5,7 +5,7 @@ from typing import Sequence
 
 from exceptions import BackupCollectorError
 from models import CollectionContext, Settings
-from services.icinga import configure_logging, handle_error, handle_success, show_progress
+from services.icinga import configure_logging, handle_error, handle_success
 from runtime import execute
 
 CLI_EXAMPLES = """Exemples:
@@ -50,13 +50,12 @@ def create_parser() -> argparse.ArgumentParser:
         help="collection workflow, parser and default destination",
     )
 
-    assets = collect.add_mutually_exclusive_group()
-    assets.add_argument(
+    collect.add_argument(
         "--asset",
+        required=True,
         metavar="HOSTNAME",
         help="asset hostname resolved through the external referential",
     )
-    assets.add_argument("--all-assets", action="store_true", help="reserved for future use")
 
     collect.add_argument("--start-time", type=parse_datetime, metavar="ISO_DATETIME")
     collect.add_argument("--end-time", type=parse_datetime, metavar="ISO_DATETIME")
@@ -83,10 +82,8 @@ def create_parser() -> argparse.ArgumentParser:
 def context_from_args(args: argparse.Namespace) -> CollectionContext:
     return CollectionContext(
         source=args.source,
-        data_type="workflow",
         scope=args.scope,
         asset=args.asset,
-        all_assets=args.all_assets,
         start_time=args.start_time,
         end_time=args.end_time,
         hours=args.hours,
@@ -106,7 +103,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = execute(
             context,
             settings=settings,
-            progress=show_progress if pretty else None,
+            show_progress=pretty,
         )
     except BackupCollectorError as exc:
         return handle_error(context, exc)

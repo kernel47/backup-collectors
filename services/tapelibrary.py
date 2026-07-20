@@ -5,7 +5,7 @@ from models import Asset, CollectionContext, CollectionResult
 def collect(
     data_type: str,
     context: CollectionContext,
-    asset: Asset | None = None,
+    asset: Asset,
 ) -> CollectionResult:
     del data_type, context, asset
     raise CollectionError("Tape Library collection is not implemented yet")

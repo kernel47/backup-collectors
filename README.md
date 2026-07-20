@@ -13,11 +13,10 @@ cli.py
   -> runtime.py
   -> services/referential.py pour résoudre le hostname en objet Asset
   -> collectors/<scope>/collector.py
-  -> collectors/netbackup.py, datadomain.py ou tapelibrary.py
-  -> modules/netbackup.py pour accéder au package externe nbu
+  -> services/netbackup.py, datadomain.py ou tapelibrary.py
   -> collectors/<scope>/parser.py
-  -> collectors/<scope>/output.py
   -> services/output.py
+  -> services/icinga.py pour la progression, les logs et le rapport
   -> Backup Hub, Logstash, Referential, fichier ou stdout
 ```
 
@@ -28,36 +27,33 @@ le scope. Chaque scope reste autonome pour ses collectes, son traitement et sa s
 ## Structure
 
 ```text
-modules/
-└── netbackup.py     # wrapper du package externe netbackup-py / nbu
-
 collectors/
-├── netbackup.py             # accès technique à la source NetBackup
-├── datadomain.py            # futur accès technique à Data Domain
-├── tapelibrary.py           # futur accès technique à Tape Library
 ├── pamela/
 │   ├── collector.py         # séquence policies -> clients -> jobs
-│   ├── parser.py            # traitement et filtres Pamela
-│   └── output.py            # destination Backup Hub
+│   └── parser.py            # traitement et filtres Pamela
 ├── logstash/
 │   ├── collector.py         # séquence jobs -> policies -> images
-│   ├── parser.py            # format des événements Logstash
-│   └── output.py            # destination Logstash
+│   └── parser.py            # format des événements Logstash
 └── baseline/
     ├── collector.py         # séquence propre à chaque source
-    ├── parser.py            # règles Baseline
-    └── output.py            # destination Referential
+    └── parser.py            # règles Baseline
 
 services/
+├── netbackup.py     # accès au package externe netbackup-py / nbu
+├── datadomain.py    # futur accès Data Domain
+├── tapelibrary.py   # futur accès Tape Library
 ├── referential.py   # recherche d'un asset à partir de son hostname
-├── output.py        # Backup Hub, Logstash, Referential, fichier et stdout
-└── icinga.py        # messages, logs et codes retour Icinga
+├── output.py        # HTTP, fichier, stdout, Backup Hub et Logstash
+└── icinga.py        # progression, logs, rapport et codes retour Icinga
 ```
+
+Il n'existe plus de dossiers racine `parsers/` ou `modules/`. Un parser appartient à
+son scope, et une intégration externe appartient aux services.
 
 Les fichiers racine restent simples :
 
 - `cli.py` définit les arguments, crée le contexte et lance la commande ;
-- `runtime.py` résout l'asset et transmet l'exécution au collecteur du scope ;
+- `runtime.py` résout l'asset et appelle explicitement le collecteur du scope ;
 - `models.py` contient toutes les dataclasses, y compris le contexte, les résultats et
   les réglages des destinations ;
 - `exceptions.py` contient les erreurs applicatives.
@@ -122,7 +118,7 @@ pour éviter leur apparition accidentelle dans les logs.
 REFERENTIAL_ASSET_URL=https://referential.example.test/api/assets/{hostname}
 ```
 
-`modules/netbackup.py` utilise ensuite les paramètres API de cet objet pour créer le
+`services/netbackup.py` utilise ensuite les paramètres API de cet objet pour créer le
 client `netbackup-py`. Le support SSH pourra utiliser les paramètres SSH du même objet.
 
 Variables disponibles pour les destinations :
@@ -185,8 +181,8 @@ pas conservées pendant la collecte suivante. Les totaux sont cumulés pour le r
 final.
 
 Pour ajouter ou modifier un besoin futur propre à Pamela, Baseline ou Logstash, les
-changements restent dans le dossier du scope concerné. Les collecteurs techniques de
-source et les services génériques ne changent que si leur protocole évolue.
+changements restent dans le dossier du scope concerné. Les services ne changent que si
+l'accès à une source ou à une destination évolue.
 
 Les routes Baseline Data Domain et Tape Library existent déjà, mais leurs collecteurs
 seront définis ultérieurement :
@@ -224,8 +220,10 @@ $BACKUP_COLLECTOR_OUTPUT_DIR/<scope>/<source>/<data_type>/
 
 ## Icinga
 
-`services/icinga.py` est le seul fichier à modifier pour changer les messages, les logs
-ou les codes retour : `0 OK`, `1 WARNING`, `2 CRITICAL`, `3 UNKNOWN`.
+Chaque scope utilise `services/icinga.py` pour afficher sa progression et écrire un log
+après chaque type de données. Ce service reste le seul fichier à modifier pour changer
+les messages, le rapport ou les codes retour : `0 OK`, `1 WARNING`, `2 CRITICAL`,
+`3 UNKNOWN`.
 
 Chaque collecte terminée écrit aussi un log `INFO` avec le statut, le total collecté,
 le total parsé, le total envoyé et la durée. Pour l'afficher :

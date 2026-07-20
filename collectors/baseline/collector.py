@@ -1,52 +1,66 @@
-from dataclasses import replace
-from typing import Any, Callable
-
-from collectors import datadomain, netbackup, tapelibrary
-from collectors.baseline import output, parser
+from collectors.baseline import parser
 from models import Asset, CollectionContext, CollectionResult, ScopeResult, Settings
+from services import datadomain, icinga, netbackup, output, tapelibrary
 
 
 def collect(
     context: CollectionContext,
     settings: Settings,
-    asset: Asset | None,
-    source_client: Any = None,
-    progress: Callable[..., None] | None = None,
+    asset: Asset,
+    show_progress: bool = False,
 ) -> ScopeResult:
     result = ScopeResult()
+    hostname = asset.hostname
+
     for data_type in _data_types(context.source):
-        step = replace(context, data_type=data_type)
-        hostname = asset.hostname if asset else context.asset
-        _progress(progress, "collection_started", data_type=data_type, hostname=hostname)
-        collected = _collect_source(step, source_client, asset)
+        _progress(show_progress, "collection_started", data_type=data_type, hostname=hostname)
+        collected = _collect_source(data_type, context, asset)
         result.collected_count += collected.record_count
         _progress(
-            progress,
+            show_progress,
             "collection_finished",
             data_type=data_type,
             total=collected.record_count,
         )
 
-        _progress(progress, "parsing_started", data_type=data_type, scope="baseline")
+        _progress(show_progress, "parsing_started", data_type=data_type, scope="baseline")
         parsed = parser.parse(data_type, collected.records)
         result.parsed_count += len(parsed)
-        _progress(progress, "parsing_finished", data_type=data_type, total=len(parsed))
+        _progress(show_progress, "parsing_finished", data_type=data_type, total=len(parsed))
 
+        sent = 0
         if not context.dry_run:
             _progress(
-                progress,
+                show_progress,
                 "output_started",
                 data_type=data_type,
-                destination=output.destination(step),
+                destination=output.destination_for(context),
             )
-            sent = output.send(parsed, step, settings, collected.asset)
+            sent = output.send(
+                parsed,
+                context,
+                settings,
+                data_type=data_type,
+                asset=collected.asset,
+                metadata={"workflow": "baseline"},
+            )
             result.sent_count += sent
-            _progress(progress, "output_finished", data_type=data_type, total=sent)
+            _progress(show_progress, "output_finished", data_type=data_type, total=sent)
+
+        icinga.log_collection(
+            "baseline",
+            context.source,
+            data_type,
+            collected.record_count,
+            len(parsed),
+            sent,
+        )
 
         del collected, parsed
 
     if context.dry_run:
-        _progress(progress, "dry_run")
+        _progress(show_progress, "dry_run")
+    icinga.log_scope_result("baseline", context.source, result)
     return result
 
 
@@ -57,17 +71,17 @@ def _data_types(source: str) -> tuple[str, ...]:
 
 
 def _collect_source(
+    data_type: str,
     context: CollectionContext,
-    source_client: Any,
-    asset: Asset | None,
+    asset: Asset,
 ) -> CollectionResult:
     if context.source == "netbackup":
-        return netbackup.collect(context.data_type, context, source_client, asset)
+        return netbackup.collect(data_type, context, asset)
     if context.source == "datadomain":
-        return datadomain.collect(context.data_type, context, asset)
-    return tapelibrary.collect(context.data_type, context, asset)
+        return datadomain.collect(data_type, context, asset)
+    return tapelibrary.collect(data_type, context, asset)
 
 
-def _progress(callback: Callable[..., None] | None, event: str, **details: object) -> None:
-    if callback:
-        callback(event, **details)
+def _progress(enabled: bool, event: str, **details: object) -> None:
+    if enabled:
+        icinga.show_progress(event, **details)

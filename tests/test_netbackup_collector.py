@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from collectors.netbackup import collect
-from models import CollectionContext
+from services.netbackup import collect
+from models import Asset, CollectionContext
 
 
 class Model:
@@ -33,7 +33,10 @@ def client():
 
 def test_collect_policies_through_nbu_service():
     result = collect(
-        "policies", CollectionContext("netbackup", "policies", "pamela"), client()
+        "policies",
+        CollectionContext("netbackup", "pamela", "master-01"),
+        Asset(hostname="master-01", api=True),
+        client(),
     )
     assert result.asset == "master-01"
     assert result.records == [{"value": {"include_details": True}}]
@@ -41,6 +44,9 @@ def test_collect_policies_through_nbu_service():
 
 def test_clients_collection_uses_policy_clients():
     result = collect(
-        "clients", CollectionContext("netbackup", "clients", "pamela"), client()
+        "clients",
+        CollectionContext("netbackup", "pamela", "master-01"),
+        Asset(hostname="master-01", api=True),
+        client(),
     )
     assert result.records == [{"value": "client-01"}]

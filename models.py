@@ -30,6 +30,8 @@ class CollectionContext:
     end_time: datetime | None = None
     hours: int | None = None
     days: int | None = None
+    policy_types: tuple[str, ...] = ()
+    policy_names: tuple[str, ...] = ()
     output: str | None = None
     dry_run: bool = False
 

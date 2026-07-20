@@ -26,7 +26,7 @@ def collect(
         )
 
         _progress(show_progress, "parsing_started", data_type=data_type, scope="pamela")
-        parsed = parser.parse(data_type, collected.records)
+        parsed = parser.parse(data_type, collected.records, context)
         result.parsed_count += len(parsed)
         _progress(show_progress, "parsing_finished", data_type=data_type, total=len(parsed))
 

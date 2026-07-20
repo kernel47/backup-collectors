@@ -62,6 +62,18 @@ def create_parser() -> argparse.ArgumentParser:
     period = collect.add_mutually_exclusive_group()
     period.add_argument("--hours", type=int, help="collect the last N hours")
     period.add_argument("--days", type=int, help="collect the last N days")
+    collect.add_argument(
+        "--policy-type",
+        action="append",
+        default=[],
+        help="keep this NetBackup policy type (repeatable)",
+    )
+    collect.add_argument(
+        "--policy-name",
+        action="append",
+        default=[],
+        help="keep policy names matching this pattern, for example PROD-* (repeatable)",
+    )
 
     collect.add_argument(
         "--output",
@@ -88,6 +100,8 @@ def context_from_args(args: argparse.Namespace) -> CollectionContext:
         end_time=args.end_time,
         hours=args.hours,
         days=args.days,
+        policy_types=tuple(args.policy_type),
+        policy_names=tuple(args.policy_name),
         output=args.output,
         dry_run=args.dry_run,
     )

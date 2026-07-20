@@ -2,6 +2,7 @@ from typing import Any
 
 from exceptions import CollectionError, ConfigurationError
 from models import Asset, CollectionContext, CollectionResult
+from services import ssh
 
 
 def collect(
@@ -12,12 +13,15 @@ def collect(
 ) -> CollectionResult:
     owns_client = client is None
     if client is None:
-        client = create_client(asset)
+        client = create_api_client(asset)
 
     try:
         try:
             if data_type == "policies":
-                items = client.policies.list(include_details=True)
+                parameters: dict[str, Any] = {"include_details": True}
+                if len(context.policy_names) == 1 and not _has_wildcard(context.policy_names[0]):
+                    parameters["name"] = context.policy_names[0]
+                items = client.policies.list(**parameters)
             elif data_type == "clients":
                 items = client.policies.clients()
             elif data_type == "jobs":
@@ -38,7 +42,7 @@ def collect(
             client.close()
 
 
-def create_client(asset: Asset) -> Any:
+def create_api_client(asset: Asset) -> Any:
     if not asset.api:
         raise ConfigurationError(f"NetBackup API is disabled for hostname={asset.hostname}")
     try:
@@ -52,6 +56,19 @@ def create_client(asset: Asset) -> Any:
         domain_type=asset.domain_type,
         domain_name=asset.domain_name,
         version=asset.version,
+    )
+
+
+def create_ssh_client(asset: Asset, *, port: int = 22) -> Any:
+    if not asset.ssh:
+        raise ConfigurationError(f"NetBackup SSH is disabled for hostname={asset.hostname}")
+    if not asset.ssh_username:
+        raise ConfigurationError(f"NetBackup SSH username is missing for hostname={asset.hostname}")
+    return ssh.create_client(
+        asset.hostname,
+        asset.ssh_username,
+        asset.ssh_password,
+        port=port,
     )
 
 
@@ -78,3 +95,7 @@ def _as_dict(item: Any) -> dict:
     if hasattr(item, "model_dump"):
         return item.model_dump(mode="json")
     raise TypeError(f"Unsupported NetBackup record type: {type(item).__name__}")
+
+
+def _has_wildcard(value: str) -> bool:
+    return any(character in value for character in "*?[")

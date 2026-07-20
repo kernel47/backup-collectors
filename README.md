@@ -15,7 +15,7 @@ cli.py
   -> collectors/<scope>/collector.py
   -> services/netbackup.py, datadomain.py ou tapelibrary.py
   -> collectors/<scope>/parser.py
-  -> services/output.py
+  -> services/output.py route vers file_output, http_output ou logstash_output
   -> services/icinga.py pour la progression, les logs et le rapport
   -> Backup Hub, Logstash, Referential, fichier ou stdout
 ```
@@ -39,12 +39,17 @@ collectors/
     └── parser.py            # règles Baseline
 
 services/
-├── netbackup.py     # accès au package externe netbackup-py / nbu
-├── datadomain.py    # futur accès Data Domain
-├── tapelibrary.py   # futur accès Tape Library
-├── referential.py   # recherche d'un asset à partir de son hostname
-├── output.py        # HTTP, fichier, stdout, Backup Hub et Logstash
-└── icinga.py        # progression, logs, rapport et codes retour Icinga
+├── netbackup.py        # clients API nbu et SSH NetBackup
+├── ssh.py              # client SSH générique et exécution de commande
+├── datadomain.py       # futur accès Data Domain
+├── tapelibrary.py      # futur accès Tape Library
+├── referential.py      # recherche d'un asset à partir de son hostname
+├── record_filters.py   # filtres génériques par nom, type et date
+├── output.py           # routeur léger des destinations
+├── file_output.py      # écriture JSON atomique
+├── http_output.py      # POST JSON générique
+├── logstash_output.py  # envoi vers l'input HTTP Logstash
+└── icinga.py           # progression, logs, rapport et codes retour Icinga
 ```
 
 Il n'existe plus de dossiers racine `parsers/` ou `modules/`. Un parser appartient à
@@ -118,8 +123,21 @@ pour éviter leur apparition accidentelle dans les logs.
 REFERENTIAL_ASSET_URL=https://referential.example.test/api/assets/{hostname}
 ```
 
-`services/netbackup.py` utilise ensuite les paramètres API de cet objet pour créer le
-client `netbackup-py`. Le support SSH pourra utiliser les paramètres SSH du même objet.
+`services/netbackup.py` expose deux clients à partir du même objet :
+
+```python
+from services.netbackup import create_api_client, create_ssh_client
+from services.ssh import run
+
+api_client = create_api_client(asset)
+ssh_client = create_ssh_client(asset)
+exit_code, stdout, stderr = run(ssh_client, "hostname")
+ssh_client.close()
+```
+
+Le client API utilise `api_username` et `api_password`. Le client SSH utilise
+`ssh_username` et `ssh_password`. Par sécurité, le serveur SSH doit déjà être présent
+dans les clés hôtes connues de la machine qui exécute la collecte.
 
 Variables disponibles pour les destinations :
 
@@ -155,7 +173,9 @@ backup-collector collect netbackup \
 backup-collector collect netbackup \
   --asset master-emea-01 \
   --scope pamela \
-  --hours 24
+  --hours 24 \
+  --policy-type Standard \
+  --policy-name 'PROD-*'
 
 backup-collector collect netbackup \
   --asset master-emea-01 \
@@ -179,6 +199,11 @@ Par exemple, Pamela envoie les policies avant de commencer les clients, puis env
 les clients avant de collecter les jobs. Les listes des étapes précédentes ne sont donc
 pas conservées pendant la collecte suivante. Les totaux sont cumulés pour le résumé
 final.
+
+`--policy-type` et `--policy-name` sont répétables. Les noms acceptent les patterns
+`*`, `?` et `[]`. Un nom exact est également envoyé à l'API NetBackup pour limiter le
+volume récupéré. Les jobs sont filtrés pendant le fetch puis à nouveau dans le parser
+avec `--start-time`, `--end-time`, `--hours` ou `--days`.
 
 Pour ajouter ou modifier un besoin futur propre à Pamela, Baseline ou Logstash, les
 changements restent dans le dossier du scope concerné. Les services ne changent que si
@@ -212,7 +237,13 @@ Une commande peut surcharger cette destination avec :
 --output stdout
 ```
 
-`--output file` écrit atomiquement sous :
+Les sorties sont indépendantes et réutilisables :
+
+- `file_output.py` écrit un document JSON atomiquement ;
+- `http_output.py` envoie un payload JSON vers une API HTTP ;
+- `logstash_output.py` envoie une collection vers l'input HTTP Logstash.
+
+`--output file` écrit sous :
 
 ```text
 $BACKUP_COLLECTOR_OUTPUT_DIR/<scope>/<source>/<data_type>/
@@ -225,14 +256,15 @@ après chaque type de données. Ce service reste le seul fichier à modifier pou
 les messages, le rapport ou les codes retour : `0 OK`, `1 WARNING`, `2 CRITICAL`,
 `3 UNKNOWN`.
 
-Chaque collecte terminée écrit aussi un log `INFO` avec le statut, le total collecté,
-le total parsé, le total envoyé et la durée. Pour l'afficher :
+Chaque type collecté et chaque scope terminé écrivent un log `INFO` avec le statut et
+les totaux collectés, parsés et envoyés. Le rapport final contient également la durée.
+Pour afficher les logs :
 
 ```bash
 export BACKUP_COLLECTOR_LOG_LEVEL=INFO
 ```
 
-## Tests
+## Test smoke
 
 ```bash
 python -m pytest
@@ -240,3 +272,5 @@ ruff check .
 ```
 
 Les tests n'effectuent aucun appel réel vers NetBackup ou une destination HTTP.
+Il reste volontairement un seul test CLI pour valider le chargement général du module,
+les paramètres principaux et le rapport final.

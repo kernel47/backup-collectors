@@ -1,8 +1,19 @@
 from exceptions import ParsingError
+from models import CollectionContext
+from services import record_filters
 
 
-def parse(data_type: str, records: list[dict]) -> list[dict]:
+def parse(
+    data_type: str,
+    records: list[dict],
+    context: CollectionContext,
+) -> list[dict]:
     if data_type == "policies":
+        records = record_filters.policies(
+            records,
+            types=context.policy_types,
+            names=context.policy_names,
+        )
         return [
             {
                 "master": record.get("master") or record.get("asset"),
@@ -26,6 +37,14 @@ def parse(data_type: str, records: list[dict]) -> list[dict]:
             for record in records
         ]
     if data_type == "jobs":
+        records = record_filters.dates(
+            records,
+            fields=("start_time", "startTime", "end_time", "endTime"),
+            start=context.start_time,
+            end=context.end_time,
+            hours=context.hours,
+            days=context.days,
+        )
         return [
             {
                 "master": record.get("master") or record.get("asset"),

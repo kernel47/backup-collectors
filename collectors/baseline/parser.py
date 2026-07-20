@@ -1,10 +1,18 @@
 from datetime import UTC, datetime
 
+from models import CollectionContext
+from services import record_filters
 
-def parse(data_type: str, records: list[dict]) -> list[dict]:
+
+def parse(data_type: str, records: list[dict], context: CollectionContext) -> list[dict]:
     if data_type != "policies":
         return records
 
+    records = record_filters.policies(
+        records,
+        types=context.policy_types,
+        names=context.policy_names,
+    )
     evaluated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     findings = []
     for policy in records:

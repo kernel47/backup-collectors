@@ -16,6 +16,10 @@ PROGRESS_MESSAGES = {
     "collection_finished": lambda data: (
         f"{data['total']} {data['data_type']} collecté(s)"
     ),
+    "policy_clients_started": lambda data: (
+        f"Collecte des clients pour {data['total']} policy(s) sélectionnée(s)"
+    ),
+    "policy_clients_finished": lambda data: f"{data['total']} client(s) associé(s)",
     "parsing_started": lambda data: (
         f"Parsing {data['data_type']} pour le scope {data['scope']}"
     ),
@@ -30,6 +34,7 @@ PROGRESS_MESSAGES = {
 FINISHED_EVENTS = {
     "asset_lookup_finished",
     "collection_finished",
+    "policy_clients_finished",
     "parsing_finished",
     "output_finished",
     "dry_run",

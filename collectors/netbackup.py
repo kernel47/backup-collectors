@@ -1,45 +1,8 @@
 from typing import Any
 
 from exceptions import CollectionError, ConfigurationError
-from models import Asset, CollectionContext, CollectionResult
+from models import Asset, CollectionContext
 from services import ssh
-
-
-def collect(
-    data_type: str,
-    context: CollectionContext,
-    asset: Asset,
-    client: Any = None,
-) -> CollectionResult:
-    owns_client = client is None
-    if client is None:
-        client = create_api_client(asset)
-
-    try:
-        try:
-            if data_type == "policies":
-                parameters: dict[str, Any] = {"include_details": True}
-                if len(context.policy_names) == 1 and not _has_wildcard(context.policy_names[0]):
-                    parameters["name"] = context.policy_names[0]
-                items = client.policies.list(**parameters)
-            elif data_type == "clients":
-                items = client.policies.clients()
-            elif data_type == "jobs":
-                items = client.jobs.list(**_date_parameters(context))
-            elif data_type == "images":
-                items = client.images.list(**_date_parameters(context))
-            else:
-                raise CollectionError(f"Unsupported NetBackup data type: {data_type}")
-            records = [_as_dict(item) for item in items]
-        except CollectionError:
-            raise
-        except Exception as exc:
-            raise CollectionError(f"NetBackup {data_type} collection failed: {exc}") from exc
-
-        return CollectionResult(asset=asset.hostname, records=records)
-    finally:
-        if owns_client and hasattr(client, "close"):
-            client.close()
 
 
 def create_api_client(asset: Asset) -> Any:
@@ -72,6 +35,36 @@ def create_ssh_client(asset: Asset, *, port: int = 22) -> Any:
     )
 
 
+def collect_policies(client: Any) -> list[dict]:
+    try:
+        return _records(client.policies.list(include_details=False))
+    except Exception as exc:
+        raise CollectionError(f"NetBackup policies collection failed: {exc}") from exc
+
+
+def collect_policy(client: Any, policy_name: str) -> dict:
+    try:
+        return _record(client.policies.get(policy_name))
+    except Exception as exc:
+        raise CollectionError(
+            f"NetBackup policy details collection failed for policy={policy_name}: {exc}"
+        ) from exc
+
+
+def collect_jobs(client: Any, context: CollectionContext) -> list[dict]:
+    try:
+        return _records(client.jobs.list(**_date_parameters(context)))
+    except Exception as exc:
+        raise CollectionError(f"NetBackup jobs collection failed: {exc}") from exc
+
+
+def collect_images(client: Any, context: CollectionContext) -> list[dict]:
+    try:
+        return _records(client.images.list(**_date_parameters(context)))
+    except Exception as exc:
+        raise CollectionError(f"NetBackup images collection failed: {exc}") from exc
+
+
 def _date_parameters(context: CollectionContext) -> dict[str, Any]:
     hours = context.hours
     if hours is None and context.days is not None:
@@ -89,13 +82,13 @@ def _iso(value: object) -> str | None:
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
 
 
-def _as_dict(item: Any) -> dict:
+def _records(items: list[Any]) -> list[dict]:
+    return [_record(item) for item in items]
+
+
+def _record(item: Any) -> dict:
     if isinstance(item, dict):
         return item
     if hasattr(item, "model_dump"):
         return item.model_dump(mode="json")
     raise TypeError(f"Unsupported NetBackup record type: {type(item).__name__}")
-
-
-def _has_wildcard(value: str) -> bool:
-    return any(character in value for character in "*?[")

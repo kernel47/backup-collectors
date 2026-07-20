@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import os
 from pathlib import Path
-from typing import Any
 
 
 @dataclass
@@ -34,16 +33,6 @@ class CollectionContext:
     policy_names: tuple[str, ...] = ()
     output: str | None = None
     dry_run: bool = False
-
-
-@dataclass
-class CollectionResult:
-    asset: str
-    records: list[dict[str, Any]]
-
-    @property
-    def record_count(self) -> int:
-        return len(self.records)
 
 
 @dataclass

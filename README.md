@@ -13,7 +13,7 @@ cli.py
   -> runtime.py
   -> services/referential.py pour résoudre le hostname en objet Asset
   -> collectors/<scope>/collector.py
-  -> services/netbackup.py, datadomain.py ou tapelibrary.py
+  -> collectors/netbackup.py, datadomain.py ou tapelibrary.py
   -> collectors/<scope>/parser.py
   -> services/output.py route vers file_output, http_output ou logstash_output
   -> services/icinga.py pour la progression, les logs et le rapport
@@ -28,8 +28,11 @@ le scope. Chaque scope reste autonome pour ses collectes, son traitement et sa s
 
 ```text
 collectors/
+├── netbackup.py             # primitives API nbu et client SSH NetBackup
+├── datadomain.py            # futures primitives Data Domain
+├── tapelibrary.py           # futures primitives Tape Library
 ├── pamela/
-│   ├── collector.py         # séquence policies -> clients -> jobs
+│   ├── collector.py         # pipelines policies puis jobs
 │   └── parser.py            # traitement et filtres Pamela
 ├── logstash/
 │   ├── collector.py         # séquence jobs -> policies -> images
@@ -39,10 +42,7 @@ collectors/
     └── parser.py            # règles Baseline
 
 services/
-├── netbackup.py        # clients API nbu et SSH NetBackup
 ├── ssh.py              # client SSH générique et exécution de commande
-├── datadomain.py       # futur accès Data Domain
-├── tapelibrary.py      # futur accès Tape Library
 ├── referential.py      # recherche d'un asset à partir de son hostname
 ├── record_filters.py   # filtres génériques par nom, type et date
 ├── output.py           # routeur léger des destinations
@@ -53,7 +53,9 @@ services/
 ```
 
 Il n'existe plus de dossiers racine `parsers/` ou `modules/`. Un parser appartient à
-son scope, et une intégration externe appartient aux services.
+son scope. Les primitives propres à NetBackup, Data Domain ou Tape Library sont dans
+`collectors/`, tandis que `services/` ne contient que des briques génériques et
+réutilisables.
 
 Les fichiers racine restent simples :
 
@@ -123,10 +125,10 @@ pour éviter leur apparition accidentelle dans les logs.
 REFERENTIAL_ASSET_URL=https://referential.example.test/api/assets/{hostname}
 ```
 
-`services/netbackup.py` expose deux clients à partir du même objet :
+`collectors/netbackup.py` expose deux clients à partir du même objet :
 
 ```python
-from services.netbackup import create_api_client, create_ssh_client
+from collectors.netbackup import create_api_client, create_ssh_client
 from services.ssh import run
 
 api_client = create_api_client(asset)
@@ -190,20 +192,22 @@ backup-collector collect netbackup \
 Les workflows sont explicites :
 
 ```text
-pamela + netbackup   : policies -> clients -> jobs       -> Backup Hub
+pamela + netbackup   : policies enrichies avec clients -> envoi
+                       jobs -> envoi                     -> Backup Hub
 logstash + netbackup : jobs -> policies -> images        -> Logstash
 baseline + netbackup : policies                          -> Referential
 ```
 
-Par exemple, Pamela envoie les policies avant de commencer les clients, puis envoie
-les clients avant de collecter les jobs. Les listes des étapes précédentes ne sont donc
-pas conservées pendant la collecte suivante. Les totaux sont cumulés pour le résumé
-final.
+Pour Pamela, le premier pipeline collecte les policies, filtre les résultats par type
+et nom, récupère les détails et les clients de chaque policy sélectionnée, construit
+l'objet final et l'envoie. Le second pipeline ne démarre qu'après cet envoi : il
+collecte les jobs, les filtre par date, les parse et les envoie. Les clients ne sont
+jamais envoyés dans une collection séparée.
 
 `--policy-type` et `--policy-name` sont répétables. Les noms acceptent les patterns
-`*`, `?` et `[]`. Un nom exact est également envoyé à l'API NetBackup pour limiter le
-volume récupéré. Les jobs sont filtrés pendant le fetch puis à nouveau dans le parser
-avec `--start-time`, `--end-time`, `--hours` ou `--days`.
+`*`, `?` et `[]`. Le filtre est appliqué après la liste des policies et avant les appels
+de détails/clients par policy. Les jobs sont filtrés pendant le fetch puis à nouveau
+dans le parser avec `--start-time`, `--end-time`, `--hours` ou `--days`.
 
 Pour ajouter ou modifier un besoin futur propre à Pamela, Baseline ou Logstash, les
 changements restent dans le dossier du scope concerné. Les services ne changent que si

@@ -1,280 +1,333 @@
 # Backup Collector
 
-Backup Collector exécute une collecte depuis un asset de sauvegarde, parse les données
-selon un scope, puis les envoie vers une destination.
+CLI ponctuelle lancée par Tasker : collecte → vérification/parsing → envoi progressif
+OpenSearch → rapport final. Aucun scheduler ni service permanent. Backup Index reste
+responsable des mappings, alias, scripts et purges ; il n'est pas une dépendance Python.
 
-Le scope choisit une séquence complète. Chaque type de données est collecté, parsé et
-envoyé avant de passer au suivant afin de limiter la mémoire utilisée.
+## Utilisation
 
-Le flux est volontairement explicite :
-
-```text
-cli.py
-  -> runtime.py
-  -> services/referential.py pour résoudre le hostname en objet Asset
-  -> collectors/<scope>/collector.py
-  -> collectors/netbackup.py, datadomain.py ou tapelibrary.py
-  -> collectors/<scope>/parser.py
-  -> services/output.py route vers file_output, http_output ou logstash_output
-  -> services/icinga.py pour la progression, les logs et le rapport
-  -> Backup Hub, Logstash, Referential, fichier ou stdout
+```bash
+backup-collector collect --scope netbackup --type jobs --asset master-01
+backup-collector collect --scope netbackup --type jobs --asset master-01 --hours 5
+backup-collector collect --scope netbackup --type images --asset master-01 \
+  --start-date 2026-10-20T00:00:00Z --end-date 2026-10-21T00:00:00Z
+backup-collector collect --scope netbackup --type policies --asset master-01
+backup-collector collect --scope netbackup --type slps --asset master-01
 ```
 
-Il n'existe ni registre dynamique, ni découverte automatique, ni classe par petit
-composant. `runtime.py` contient uniquement les branchements lisibles qui sélectionnent
-le scope. Chaque scope reste autonome pour ses collectes, son traitement et sa sortie.
+Paramètres de base : --scope, --type, --asset, --dry-run et --debug. Jobs, images et contenus d’images
+acceptent --hours (24 heures par défaut), ou --start-date et --end-date ensemble.
+Policies et SLP n'ont aucun paramètre temporel et représentent l'état actuel.
+Les dossiers datadomain/tapelibrary sont réservés. Leur exécution échoue explicitement.
+La séquence images-contents est branchée ; son transport attend votre méthode SSH
+get_image_contents(image_id).
+
+Pour vérifier les documents sans écriture :
+
+```bash
+backup-collector collect --scope netbackup --type jobs --asset master-01 --dry-run --debug
+backup-collector collect --scope netbackup --type policies --asset master-01 --dry-run > /tmp/policies.jsonl
+```
+
+Dry-run fait une vraie collecte : il nécessite Reference et NetBackup. Il affiche un
+JSON par document sur stdout, sans créer de client OpenSearch ; diagnostics et rapport
+final vont sur stderr. En mode normal, stdout contient uniquement le rapport Tasker.
+Aucun paramètre de fixture, input-file, output-file ou ancien alias CLI n'est accepté.
 
 ## Structure
 
 ```text
+cli.py                       # arguments et sérialisation du rapport
+core/
+├── models.py                # Asset, CollectionContext, Settings et CollectionReport
+├── collection.py            # CollectionRun : petites opérations d'exécution réutilisables
+├── exceptions.py
+└── runtime.py               # routage vers la collecte demandée
 collectors/
-├── netbackup.py             # primitives API nbu et client SSH NetBackup
-├── datadomain.py            # futures primitives Data Domain
-├── tapelibrary.py           # futures primitives Tape Library
-├── pamela/
-│   ├── collector.py         # pipelines policies puis jobs
-│   └── parser.py            # traitement et filtres Pamela
-├── logstash/
-│   ├── collector.py         # séquence jobs -> policies -> images
-│   └── parser.py            # format des événements Logstash
-└── baseline/
-    ├── collector.py         # séquence propre à chaque source
-    └── parser.py            # règles Baseline
-
+├── netbackup/
+│   ├── __init__.py          # expose les cinq fonctions de collecte
+│   ├── client.py            # initialisation API/SSH, adaptation des dates nbu
+│   ├── parser.py            # sélection explicite des attributs de chaque objet
+│   ├── jobs.py
+│   ├── policies.py
+│   ├── images.py
+│   ├── images_contents.py
+│   └── slps.py
+├── datadomain/              # réservé
+└── tapelibrary/             # réservé
 services/
-├── ssh.py              # client SSH générique et exécution de commande
-├── referential.py      # recherche d'un asset à partir de son hostname
-├── record_filters.py   # filtres génériques par nom, type et date
-├── output.py           # routeur léger des destinations
-├── file_output.py      # écriture JSON atomique
-├── http_output.py      # POST JSON générique
-├── logstash_output.py  # envoi vers l'input HTTP Logstash
-└── icinga.py           # progression, logs, rapport et codes retour Icinga
+├── opensearch.py            # transport Bulk, limites et reprises
+├── referential.py           # client Reference existant
+├── documents.py             # UUID, dates de collecte, validation et hash
+└── ssh.py                   # interface en attente de votre classe SSH
 ```
 
-Il n'existe plus de dossiers racine `parsers/` ou `modules/`. Un parser appartient à
-son scope. Les primitives propres à NetBackup, Data Domain ou Tape Library sont dans
-`collectors/`, tandis que `services/` ne contient que des briques génériques et
-réutilisables.
+## Une courte séquence par collecte
 
-Les fichiers racine restent simples :
+Les paramètres sont réunis dans CollectionContext, et les options techniques dans
+Settings. Chaque fichier garde sa source et sa séquence explicite, sans recopier
+la gestion des connexions, erreurs et compteurs :
 
-- `cli.py` définit les arguments, crée le contexte et lance la commande ;
-- `runtime.py` résout l'asset et appelle explicitement le collecteur du scope ;
-- `models.py` contient toutes les dataclasses, y compris le contexte, les résultats et
-  les réglages des destinations ;
-- `exceptions.py` contient les erreurs applicatives.
-
-## Installation
-
-Installation classique des dépendances :
-
-```bash
-python -m pip install -r requirements.txt
+```python
+def collect_policies(context, settings=None):
+    run = CollectionRun(context, settings)
+    with run:
+        run.prepare()
+        run.resolve_asset()
+        run.open_clients(client)
+        run.open_output(configuration=True)
+        for record in iter_policies(run.api_client, run.ssh_client):
+            run.process(record, parser=parse_policy)
+            del record
+        run.completed = True
+    return run.report
 ```
 
-Installation du projet avec la commande `backup-collector` et les outils de
-développement :
+CollectionRun fournit de petites méthodes distinctes : préparation, résolution,
+ouverture des clients/sortie, parsing et validation, envoi, vidange et fermeture.
+process() compte un objet, appelle le parser explicitement fourni puis send().
+Chaque collecte sélectionne son parser dans collectors/netbackup/parser.py.
+La vérification technique du document est faite après la sélection des attributs ; les erreurs de document sont comptées sans arrêter les suivants.
+Le contexte ferme les connexions et vide le dernier lot même après une erreur source.
+Il ne contient ni liste de résultats ni registre dynamique.
+
+Pour les policies, iter_policies() lit les résumés puis récupère les détails de chaque
+policy : schedules, sélections et configuration. Il enrichit ensuite policy.clients
+avec ssh_client.get_policy_clients(policy.name). Le parser du connector réutilise le parser public nbu sur la réponse originale
+pour éviter de hasher les informations dérivées des SLP.
+Modifier cette source ou appeler run.process(record, parser=...) se fait dans policies.py.
+
+Exemple Python :
+
+```python
+from collectors.netbackup import collect_jobs
+from core.models import CollectionContext
+
+context = CollectionContext(type="jobs", asset="master-01", hours=5, dry_run=True)
+report = collect_jobs(context)
+print(report.to_dict())
+```
+
+Les cinq points d'entrée collect_jobs, collect_images, collect_policies, collect_slps,
+collect_images_contents ont tous la même signature (context, settings=None). Ils
+retournent CollectionReport, sans liste des documents. Le contexte valide les périodes
+pour les appels Python comme pour la CLI.
+
+## Rapport stable dans les modèles
+
+CollectionReport est défini dans core/models.py, avec CollectionStats et StorageStats.
+Il porte le contrat Tasker schema_version=1.0 : collection_id, status, asset_id,
+master_server, region, technology, resource, collection, storage, duration_seconds,
+errors. Les compteurs sont des attributs typés, pas des dictionnaires manipulés dans
+chaque script. to_dict() est l'unique sérialisation JSON et exit_code expose 0 success,
+1 failed, 2 partial. finish() calcule les statuts au même endroit pour toutes les collectes.
+
+Les écritures confirmées proviennent des résultats Bulk. Le dry-run ajoute displayed
+sans inventer des créations OpenSearch. Une collecte vide terminée normalement réussit ;
+une erreur avec des documents confirmés donne partial ; sans document confirmé, failed.
+Les erreurs sont limitées à vingt et les messages des exceptions externes ne sont pas
+recopiés. Les secrets ne sont pas inclus dans le rapport.
+
+Les paramètres applicatifs utilisent asset/type/hours/start_date/end_date. asset_id et
+resource restent uniquement les clés des contrats externes Tasker/Reference. last_hours
+est uniquement le nom requis par netbackup-py à la frontière de l'adaptateur. Les champs
+métier start_time/end_time des documents OpenSearch conservent leur nom contractuel.
+
+## Lots, mémoire et debug
+
+Un objet est récupéré, vérifié/normalisé, puis ajouté au lot avant de demander le suivant.
+Jobs et images passent par les itérateurs paginés nbu. Le rapport ne conserve que les
+compteurs et quelques erreurs. Le tampon Bulk garde les corps sérialisés, pas une
+seconde copie complète de tous les objets. La mémoire dépend du lot, de la page source
+et de l'objet courant, pas du nombre total de résultats. Policies.list/slp.list restent
+des listes internes à la bibliothèque ; les détails de policies ne sont pas cumulés.
+Le transport SSH des contenus doit lui aussi exposer un itérateur de chemins.
+
+- OPENSEARCH_BATCH_SIZE=500 : plafond général ; 1 pour envoyer chaque document.
+- OPENSEARCH_CONFIGURATION_BATCH_SIZE=50 : policies/SLP, plafonné par la limite générale ;
+  1 pour envoyer chaque configuration immédiatement.
+- OPENSEARCH_MAX_BATCH_MB=10 : limite en octets, active pour tous les lots.
+
+Chaque résultat Bulk est vérifié ; erreurs réseau/timeouts et 429/500/502/503/504 ont des
+reprises bornées avec les mêmes UUID et backoff. Les erreurs de mapping, scripts/index
+absents et conflits update restent des échecs. Une écriture non confirmée n'est jamais
+comptée comme succès. Le compte worker n'a besoin d'aucun droit d'administration.
+
+--debug trace sur stderr les étapes, la progression, les tailles de lots et les reprises,
+sans afficher de credentials, d'options SSH ni de payloads bruts. Les traces HTTP des
+bibliothèques ne sont pas activées.
+
+## Installation et configuration
+
+Python 3.12+ dans un venv, sur macOS ou RHEL, sans modifier le Python système :
 
 ```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
 python -m pip install -e '.[dev]'
-```
-
-Une fois le venv activé, cette installation crée directement la commande :
-
-```bash
-backup-collector --help
-backup-collector collect netbackup --asset master-01 --scope pamela
-```
-
-Il n'est donc plus nécessaire d'utiliser `python cli.py`. Si la commande n'est pas
-trouvée, vérifier que le bon venv est actif avec `which python` et
-`which backup-collector`, puis relancer `python -m pip install -e .`.
-
-Créer ensuite la configuration locale à partir de l'exemple :
-
-```bash
 cp .env.example .env
+# Compléter .env avec les valeurs réelles, puis exporter :
 set -a
 source .env
 set +a
+backup-collector collect --help
+ruff check --no-cache .
 ```
 
-Le programme lit les variables d'environnement ; il ne charge pas automatiquement le
-fichier `.env`.
+En production, installer avec pip install . depuis une révision validée et faire lancer
+par Tasker l'exécutable absolu du venv. Pour mettre à jour, préparer un nouveau venv,
+contrôler par dry-run puis basculer le chemin worker en conservant le précédent.
+.env n'est pas chargé automatiquement et n'est pas versionné. Les dépendances sont
+centralisées dans pyproject.toml ; netbackup-py est figé au commit
+7296f36862ad25ea2977fff7717b7d95d92757bd. L'installation nécessite l'accès SSH GitHub ou
+un packaging interne fournissant cette révision et adaptant sa référence VCS. Un miroir
+Bitbucket du seul collecteur ne suffit pas pour cette dépendance.
 
-La valeur de `--asset` est toujours un hostname. Avant la collecte, le runtime appelle
-le référentiel externe et construit un objet `Asset` contenant :
+Le client Reference existant est conservé. BACKUP_REFERENCE_URL contient l'URL réelle
+avec {asset_id} ou {hostname}, sinon la clé est ajoutée au chemin comme auparavant.
+REFERENTIAL_ASSET_URL et REFERENTIAL_TOKEN restent des alias d'environnement compatibles.
+La réponse doit fournir hostname, master_server, region et technology=netbackup ;
+master_server n'est jamais déduit du hostname. Voir .env.example et docs/compatibility.md.
 
-```text
-hostname
-api_username, api_password, api
-ssh_username, ssh_password, ssh
-domain_type, domain_name, version
-region, datacenter
-```
+TLS est vérifié par défaut. OPENSEARCH_CA_CERT fournit un bundle PEM OpenSearch.
+NETBACKUP_CA_CERT passe par SSL_CERT_FILE pendant la construction du client puis restaure
+l'environnement. SSL_CERT_FILE peut aussi configurer Reference. Aucune erreur TLS ne
+désactive automatiquement les vérifications.
 
-Les noms `api_username` et `ssh_username` évitent toute ambiguïté entre les deux jeux
-d'identifiants. Les mots de passe sont exclus de la représentation texte de l'objet
-pour éviter leur apparition accidentelle dans les logs.
+Le client SSH est construit via services.ssh.SSHClient(host, username, password, port,
+options), depuis les informations Reference. La classe actuelle expose execute(command), get_policy_clients(policy_name)
+et close(), sans transport actif. Elle attend votre implémentation ; Paramiko n'est pas
+une dépendance provisoire.
 
-`REFERENTIAL_ASSET_URL` configure la recherche. L'URL peut contenir le placeholder
-`{hostname}` ; sinon le hostname est ajouté à la fin du chemin :
+## Contrat des documents
 
-```text
-REFERENTIAL_ASSET_URL=https://referential.example.test/api/assets/{hostname}
-```
+Alias : backup-jobs, backup-images, backup-policies, backup-slps, backup-images-contents.
+Bulk impose require_alias=true ; aucun index, alias, mapping ou script n'est administré.
+Les scripts configurables backup_jobs_upsert, backup_images_upsert et
+backup_configuration_upsert reçoivent document, et pour les configurations kind et
+max_history_versions. Ils gèrent created_at, history, les mises à jour et la non-régression.
+Le collecteur ne lit pas les documents existants. Les contenus utilisent create pour
+préserver les chemins déjà enregistrés.
 
-`collectors/netbackup.py` expose deux clients à partir du même objet :
+Les UUID v5 utilisent le namespace uuid5(NAMESPACE_URL, "urn:backup-index:documents:v1")
+et un tableau JSON compact de chaînes : kind/master_server puis name (policy/SLP),
+job_id/start_time (job), image_id (image), image_id/path (contenu). Les dates sont UTC à
+la milliseconde ; casse et caractères sont préservés ; copy_number n'identifie pas une
+image. Le SHA-256 de configuration utilise un JSON canonique avec ordre des listes
+conservé. Les observations sont datées du présent, indépendamment de la fenêtre métier.
+Les limites restantes du normaliseur et des variantes NetBackup sont documentées dans
+docs/compatibility.md.
+
+
+## Mesures de performance en debug
+
+--debug ajoute un bilan sur stderr et un objet performance au rapport final :
+
+- duration_seconds : durée réelle de la collecte, résolution, écritures/reprises et
+  fermeture des connexions comprises.
+- cpu_user_seconds / cpu_system_seconds / cpu_total_seconds : temps CPU consommé par
+  le processus pendant cette exécution, en secondes.
+- cpu_average_percent : CPU total divisé par la durée réelle, avec 100 % correspondant
+  à un cœur pleinement occupé ; plusieurs threads peuvent dépasser 100 %.
+- python_peak_bytes : pic d'allocations Python suivies pendant la collecte via
+  tracemalloc. Les allocations antérieures et certaines mémoires natives sont exclues.
+- process_peak_rss_bytes : pic de mémoire résidente totale du processus depuis son
+  démarrage, mesuré par getrusage. Ce n'est ni la mémoire supplémentaire de la collecte,
+  ni la somme des pics de ses différentes étapes.
+
+Toutes les mémoires du JSON sont en octets ; le log les affiche en MiB. Les mesures
+CPU concernent le processus, sans ses sous-processus. Le profilage est activé uniquement
+en debug et ajoute un surcoût, notamment tracemalloc. Si un appelant Python a déjà
+activé tracemalloc, son traçage est préservé et python_peak_bytes vaut null pour ne pas
+attribuer un pic extérieur à la collecte. Les mesures sont également produites après
+un échec de collecte. En mode normal, le champ performance est absent.
+
+
+## Parsers propres à NetBackup
+
+Chaque fonction prend un seul objet NetBackup et retourne un dictionnaire d'attributs :
+parse_policy(policy), parse_job(job), parse_image(image), parse_slp(slp),
+parse_image_content(content). Les attributs sont écrits explicitement dans chaque
+fonction, sans fonction générique de sélection de champs ni registre de schémas.
 
 ```python
-from collectors.netbackup import create_api_client, create_ssh_client
-from services.ssh import run
-
-api_client = create_api_client(asset)
-ssh_client = create_ssh_client(asset)
-exit_code, stdout, stderr = run(ssh_client, "hostname")
-ssh_client.close()
+attributes = parse_job(job)
+# {"job_id": ..., "state": ..., "client": ..., "start_time": ..., ...}
 ```
 
-Le client API utilise `api_username` et `api_password`. Le client SSH utilise
-`ssh_username` et `ssh_password`. Par sécurité, le serveur SSH doit déjà être présent
-dans les clés hôtes connues de la machine qui exécute la collecte.
+Les parsers n'ont besoin ni de l'asset ni de l'heure de collecte. La préparation
+technique du document (UUID, métadonnées, validation des types/dates, hash) reste
+séparée dans services/documents.py. Elle produit le ParsedDocument utilisé par la
+sortie. Les clients enrichis des policies et les configurations propres sont conservés.
 
-Variables disponibles pour les destinations :
 
-```text
-BACKUP_HUB_URL, BACKUP_HUB_TOKEN
-LOGSTASH_URL, LOGSTASH_TOKEN
-REFERENTIAL_ASSET_URL, REFERENTIAL_URL, REFERENTIAL_TOKEN
-BACKUP_COLLECTOR_OUTPUT_DIR, BACKUP_COLLECTOR_LOG_LEVEL
+## Mesures en debug
+
+--debug ajoute performance au rapport : temps CPU utilisateur/système/total,
+pourcentage CPU moyen (100 % = un cœur), pic d'allocations Python pendant la collecte
+et pic RSS du processus depuis son démarrage. Les mémoires JSON sont en octets,
+les logs en MiB ; duration_seconds reste la durée réelle. Ces mesures concernent le
+processus, sans sous-processus, et le traçage Python a un surcoût. Un tracemalloc déjà
+actif chez l'appelant est préservé et le pic Python de la collecte vaut alors null.
+Hors debug, performance est absent. Le bilan est disponible aussi après un échec.
+
+
+## Séquence des policies et clients SSH
+
+1. policies.list(include_details=False) récupère les résumés.
+2. policies.get(name) récupère le détail d'une policy.
+3. ssh_client.get_policy_clients(name) récupère ses clients et remplit policy.clients.
+4. parse_policy(policy) sélectionne les attributs ; le document rejoint le lot Bulk.
+
+Cette séquence est exécutée policy par policy, avec la même connexion SSH. Le contrat
+local get_policy_clients est une liste de noms de clients (list[str]) ; une liste vide
+est valide, mais None, un échec ou une sortie non parsée ne remplace pas les clients
+par une liste vide. SSH doit être activé dans l'asset Reference. Votre classe doit
+remplacer l'emplacement get_policy_clients dans services/ssh.py ; aucune commande ou
+syntaxe de sortie n'est inventée ici. Un échec arrête la source et le dernier lot de
+policies déjà complètes est envoyé ; le rapport est partial s'il y a des écritures
+confirmées. La policy dont les clients n'ont pas été récupérés n'est pas envoyée.
+
+
+## Exclusions de policies dans le code
+
+Modifier directement les deux listes en tête de collectors/netbackup/policies.py :
+
+```python
+EXCLUDE_TYPES = ["VMware", "Standard"]
+EXCLUDE_NAMES = ["test", "ancienne"]
 ```
 
-`REFERENTIAL_ASSET_URL` sert à lire la configuration de l'asset.
-`REFERENTIAL_URL` reste la destination d'écriture du scope `baseline`.
+Les listes sont vides par défaut. Le type est comparé exactement, sans distinction
+de casse. Chaque nom exclu est un fragment recherché dans le nom complet de la policy,
+également sans distinction de casse. Une correspondance de type OU de nom suffit.
+Les fragments vides sont ignorés. Aucune option CLI n'est ajoutée.
 
-## Commandes
+L'exclusion utilise les résumés de la liste API et intervient avant policies.get et
+get_policy_clients : aucun appel de détail ni SSH pour les policies ignorées. Le
+rapport collection.excluded les compte séparément ; collected représente les policies
+complètes effectivement traitées. Exclure toutes les policies reste une collecte
+vide réussie, si les étapes requises sont disponibles.
 
-L'aide intégrée rappelle les paramètres disponibles et contient des exemples :
+
+## Collecte des contenus d'images
 
 ```bash
-backup-collector --help
-backup-collector collect --help
+backup-collector collect --scope netbackup --type images-contents --asset master-01 \
+  --hours 24 --dry-run --debug
 ```
 
-Dans un terminal interactif, la commande affiche la progression de la résolution de
-l'asset, de la collecte, du parsing et de l'envoi. Utiliser `--no-progress` pour la
-masquer ou `--progress` pour la forcer dans un terminal non interactif. Le format
-Icinga reste automatiquement sur une seule ligne hors terminal.
+Cette collecte est indépendante de images, qui conserve son fonctionnement de collecte
+des métadonnées. images-contents suit l'itérateur API des images de la période, puis
+appelle ssh_client.get_image_contents(image.image_id) pour chaque image. Le contrat
+local proposé pour cette méthode est un itérateur de chemins de répertoires (str),
+sans préchargement de tous les chemins. La classe SSH doit implémenter cette méthode ;
+aucune commande ni format brut SSH n'est présumé.
 
-```bash
-backup-collector collect netbackup \
-  --asset master-emea-01 \
-  --scope pamela
-
-backup-collector collect netbackup \
-  --asset master-emea-01 \
-  --scope pamela \
-  --hours 24 \
-  --policy-type Standard \
-  --policy-name 'PROD-*'
-
-backup-collector collect netbackup \
-  --asset master-emea-01 \
-  --scope logstash
-
-backup-collector collect netbackup \
-  --asset master-emea-01 \
-  --scope baseline \
-  --output referential
-```
-
-Les workflows sont explicites :
-
-```text
-pamela + netbackup   : policies enrichies avec clients -> envoi
-                       jobs -> envoi                     -> Backup Hub
-logstash + netbackup : jobs -> policies -> images        -> Logstash
-baseline + netbackup : policies                          -> Referential
-```
-
-Pour Pamela, le premier pipeline collecte les policies, filtre les résultats par type
-et nom, récupère les détails et les clients de chaque policy sélectionnée, construit
-l'objet final et l'envoie. Le second pipeline ne démarre qu'après cet envoi : il
-collecte les jobs, les filtre par date, les parse et les envoie. Les clients ne sont
-jamais envoyés dans une collection séparée.
-
-`--policy-type` et `--policy-name` sont répétables. Les noms acceptent les patterns
-`*`, `?` et `[]`. Le filtre est appliqué après la liste des policies et avant les appels
-de détails/clients par policy. Les jobs sont filtrés pendant le fetch puis à nouveau
-dans le parser avec `--start-time`, `--end-time`, `--hours` ou `--days`.
-
-Pour ajouter ou modifier un besoin futur propre à Pamela, Baseline ou Logstash, les
-changements restent dans le dossier du scope concerné. Les services ne changent que si
-l'accès à une source ou à une destination évolue.
-
-Les routes Baseline Data Domain et Tape Library existent déjà, mais leurs collecteurs
-seront définis ultérieurement :
-
-```bash
-backup-collector collect datadomain --asset dd-01 --scope baseline
-backup-collector collect tapelibrary --asset tl-01 --scope baseline
-```
-
-## Outputs
-
-Sans `--output`, la destination dépend du scope :
-
-```text
-pamela    -> backup_hub
-logstash  -> logstash
-baseline  -> referential
-```
-
-Une commande peut surcharger cette destination avec :
-
-```text
---output backup_hub
---output logstash
---output referential
---output file
---output stdout
-```
-
-Les sorties sont indépendantes et réutilisables :
-
-- `file_output.py` écrit un document JSON atomiquement ;
-- `http_output.py` envoie un payload JSON vers une API HTTP ;
-- `logstash_output.py` envoie une collection vers l'input HTTP Logstash.
-
-`--output file` écrit sous :
-
-```text
-$BACKUP_COLLECTOR_OUTPUT_DIR/<scope>/<source>/<data_type>/
-```
-
-## Icinga
-
-Chaque scope utilise `services/icinga.py` pour afficher sa progression et écrire un log
-après chaque type de données. Ce service reste le seul fichier à modifier pour changer
-les messages, le rapport ou les codes retour : `0 OK`, `1 WARNING`, `2 CRITICAL`,
-`3 UNKNOWN`.
-
-Chaque type collecté et chaque scope terminé écrivent un log `INFO` avec le statut et
-les totaux collectés, parsés et envoyés. Le rapport final contient également la durée.
-Pour afficher les logs :
-
-```bash
-export BACKUP_COLLECTOR_LOG_LEVEL=INFO
-```
-
-## Test smoke
-
-```bash
-python -m pytest
-ruff check .
-```
-
-Les tests n'effectuent aucun appel réel vers NetBackup ou une destination HTTP.
-Il reste volontairement un seul test CLI pour valider le chargement général du module,
-les paramètres principaux et le rapport final.
+Pour chaque chemin, le collecteur associe image_id et backup_time de l'image API,
+appelle parse_image_content, puis ajoute le document au Bulk borné. Il n'attend pas la
+fin de toutes les images pour envoyer les premiers lots ; un lot peut contenir des
+chemins de plusieurs images. La limite générale de 500 documents / 10 Mio s'applique,
+ou un envoi unitaire si OPENSEARCH_BATCH_SIZE=1. Le dernier lot est envoyé même après
+une erreur source. Les chemins déjà écrits ne sont jamais supprimés si un parcours
+est incomplet. Le compteur collected désigne ici le nombre de chemins traités.

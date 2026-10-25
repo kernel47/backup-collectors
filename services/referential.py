@@ -1,83 +1,81 @@
-from typing import Any
+"""Existing Reference client; URL and payload contract must be confirmed by the owner."""
+
 from urllib.parse import quote
 
 import httpx
 
-from exceptions import CollectionError, ConfigurationError
-from models import Asset, Settings
+from core.exceptions import CollectionError, ConfigurationError
+from core.models import Asset, Settings
 
 
-def get_asset(hostname: str, settings: Settings) -> Asset:
-    """Resolve a hostname through the external referential API."""
-    if not settings.referential_asset_url:
-        raise ConfigurationError("REFERENTIAL_ASSET_URL is not configured")
-
-    encoded_hostname = quote(hostname, safe="")
-    if "{hostname}" in settings.referential_asset_url:
-        url = settings.referential_asset_url.replace("{hostname}", encoded_hostname)
+def get_asset(asset: str, settings: Settings) -> Asset:
+    # Preserve the existing configured URL behavior; do not invent an API route.
+    url = settings.backup_reference_url
+    if not url:
+        raise ConfigurationError("BACKUP_REFERENCE_URL or REFERENTIAL_ASSET_URL is required")
+    encoded = quote(asset, safe="")
+    if "{asset_id}" in url or "{hostname}" in url:
+        url = url.replace("{asset_id}", encoded).replace("{hostname}", encoded)
     else:
-        url = f"{settings.referential_asset_url.rstrip('/')}/{encoded_hostname}"
-
+        url = f"{url.rstrip('/')}/{encoded}"
     headers = {"Accept": "application/json"}
-    if settings.referential_token:
-        headers["Authorization"] = f"Bearer {settings.referential_token}"
-
+    if settings.backup_reference_token:
+        headers["Authorization"] = f"Bearer {settings.backup_reference_token}"
     try:
-        response = httpx.get(url, headers=headers, timeout=30.0)
+        response = httpx.get(url, headers=headers, timeout=settings.backup_reference_timeout)
         response.raise_for_status()
         payload = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
-        raise CollectionError(f"Referential lookup failed for hostname={hostname}: {exc}") from exc
-
-    data = _asset_data(payload, hostname)
-    api_data = data.get("api_credentials") or data.get("api_config") or {}
-    ssh_data = data.get("ssh_credentials") or data.get("ssh_config") or {}
+    except (httpx.HTTPError, ValueError):
+        raise CollectionError("Backup Reference lookup failed") from None
+    data = _asset_data(payload, asset)
+    for key in ("master_server", "region", "technology", "hostname"):
+        if not isinstance(data.get(key), str) or not data[key].strip():
+            raise CollectionError(f"Backup Reference asset missing {key}")
+    if data["technology"].lower() != "netbackup":
+        raise CollectionError("Only NetBackup assets are currently supported")
+    if data.get("asset_id", asset) != asset:
+        raise CollectionError("Backup Reference returned a different asset_id")
+    api = data.get("api_credentials") or data.get("api_config") or {}
+    ssh = data.get("ssh_credentials") or data.get("ssh_config") or {}
     return Asset(
-        hostname=str(data.get("hostname") or hostname),
-        api_username=_first(
-            data.get("api_username"), data.get("username"), api_data.get("username")
-        ),
-        api_password=_first(
-            data.get("api_password"), data.get("password"), api_data.get("password")
-        ),
-        domain_type=str(data.get("domain_type") or api_data.get("domain_type") or ""),
-        domain_name=str(data.get("domain_name") or api_data.get("domain_name") or ""),
-        version=_first(data.get("version"), api_data.get("version")),
-        ssh_username=_first(data.get("ssh_username"), ssh_data.get("username")),
-        ssh_password=_first(data.get("ssh_password"), ssh_data.get("password")),
-        api=_as_bool(data.get("api", False)),
+        asset=asset,
+        master_server=data["master_server"],
+        hostname=data["hostname"],
+        region=data["region"],
+        technology="netbackup",
+        api_endpoint=data.get("api_endpoint"),
+        connection_method=data.get("connection_method", "rest"),
+        api_username=data.get("api_username", api.get("username")),
+        api_password=data.get("api_password", api.get("password")),
+        api_token=data.get("api_token", api.get("token")),
+        domain_type=data.get("domain_type", api.get("domain_type", "")),
+        domain_name=data.get("domain_name", api.get("domain_name", "")),
+        version=data.get("version", api.get("version")),
+        ssh_username=data.get("ssh_username", ssh.get("username")),
+        ssh_password=data.get("ssh_password", ssh.get("password")),
+        ssh_port=data.get("ssh_port", ssh.get("port", 22)),
+        ssh_options=data.get("ssh_options", ssh.get("options", {})),
+        api=_as_bool(data.get("api", True)),
         ssh=_as_bool(data.get("ssh", False)),
-        region=data.get("region"),
-        datacenter=data.get("datacenter"),
     )
 
 
-def _asset_data(payload: Any, hostname: str) -> dict[str, Any]:
+def _asset_data(payload, asset):
     if isinstance(payload, dict):
-        data = payload.get("data", payload)
-        if isinstance(data, dict):
-            return data
-        if isinstance(data, list):
-            payload = data
+        payload = payload.get("data", payload)
     if isinstance(payload, list):
-        match = next(
+        payload = next(
             (
-                item
-                for item in payload
-                if isinstance(item, dict) and item.get("hostname") == hostname
+                v
+                for v in payload
+                if isinstance(v, dict) and v.get("asset_id", v.get("hostname")) == asset
             ),
             None,
         )
-        if isinstance(match, dict):
-            return match
-    raise CollectionError(f"Referential returned no asset for hostname={hostname}")
+    if not isinstance(payload, dict) or not payload:
+        raise CollectionError("Backup Reference returned no asset")
+    return payload
 
 
-def _first(*values: Any) -> Any:
-    return next((value for value in values if value is not None), None)
-
-
-def _as_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    return str(value).lower() in {"1", "true", "yes", "on"}
+def _as_bool(value):
+    return value is True or str(value).lower() in {"1", "true", "yes", "on"}

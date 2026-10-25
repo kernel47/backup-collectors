@@ -1,9 +1,5 @@
 class BackupCollectorError(Exception):
-    """Base error expected by the command-line interface."""
-
-
-class UnsupportedCollectionError(BackupCollectorError):
-    pass
+    """Expected application error; messages must not contain credentials."""
 
 
 class CollectionError(BackupCollectorError):
@@ -14,10 +10,5 @@ class ParsingError(BackupCollectorError):
     pass
 
 
-class OutputError(BackupCollectorError):
-    pass
-
-
 class ConfigurationError(BackupCollectorError):
     pass
-

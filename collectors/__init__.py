@@ -1,2 +1,1 @@
-"""Asset collectors selected by runtime.py."""
-
+"""Technology-specific collectors selected by core.runtime."""

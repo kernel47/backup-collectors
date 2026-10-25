@@ -1,129 +1,74 @@
 import argparse
-from datetime import datetime
+import json
+import logging
 import sys
-from typing import Sequence
+from datetime import datetime
 
-from exceptions import BackupCollectorError
-from models import CollectionContext, Settings
-from services.icinga import configure_logging, handle_error, handle_success
-from runtime import execute
-
-CLI_EXAMPLES = """Exemples:
-  backup-collector collect netbackup --asset master-01 --scope pamela --hours 24
-  backup-collector collect netbackup --asset master-01 --scope logstash --hours 24
-  backup-collector collect netbackup --asset master-01 --scope baseline
-  backup-collector collect datadomain --asset dd-01 --scope baseline
-"""
+from core.models import CollectionContext, CollectionReport
+from core.runtime import execute
 
 
-def parse_datetime(value: str) -> datetime:
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        raise ValueError(message)
+
+
+def parse_datetime(value):
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(f"Invalid ISO-8601 datetime: {value}") from exc
+        parsed = datetime.fromisoformat(value)
+        if parsed.tzinfo is None:
+            raise ValueError()
+        return parsed
+    except ValueError:
+        raise argparse.ArgumentTypeError("Expected an ISO-8601 date with timezone") from None
 
 
-def create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="backup-collector",
-        description="Collect, parse and send backup asset data.",
-        epilog=CLI_EXAMPLES,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+def create_parser():
+    parser = Parser(
+        prog="backup-collector", description="Collect backup data for one asset", allow_abbrev=False
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    collect = subparsers.add_parser(
-        "collect",
-        help="run a collection pipeline",
-        description="Run the source workflow selected by the scope for one asset.",
-        epilog=CLI_EXAMPLES,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+    sub = parser.add_subparsers(dest="command", required=True)
+    collect = sub.add_parser("collect", allow_abbrev=False)
+    collect.add_argument(
+        "--scope", required=True, choices=["netbackup", "datadomain", "tapelibrary"]
     )
     collect.add_argument(
-        "source",
-        choices=["netbackup", "datadomain", "tapelibrary"],
-        help="asset collector to use",
-    )
-    collect.add_argument(
-        "--scope",
+        "--type",
         required=True,
-        choices=["pamela", "logstash", "baseline"],
-        help="collection workflow, parser and default destination",
+        choices=["jobs", "policies", "images", "images-contents", "slps"],
     )
-
+    collect.add_argument("--asset", required=True)
     collect.add_argument(
-        "--asset",
-        required=True,
-        metavar="HOSTNAME",
-        help="asset hostname resolved through the external referential",
-    )
-
-    collect.add_argument("--start-time", type=parse_datetime, metavar="ISO_DATETIME")
-    collect.add_argument("--end-time", type=parse_datetime, metavar="ISO_DATETIME")
-    period = collect.add_mutually_exclusive_group()
-    period.add_argument("--hours", type=int, help="collect the last N hours")
-    period.add_argument("--days", type=int, help="collect the last N days")
-    collect.add_argument(
-        "--policy-type",
-        action="append",
-        default=[],
-        help="keep this NetBackup policy type (repeatable)",
+        "--dry-run", action="store_true", help="Print documents without OpenSearch writes"
     )
     collect.add_argument(
-        "--policy-name",
-        action="append",
-        default=[],
-        help="keep policy names matching this pattern, for example PROD-* (repeatable)",
+        "--debug", action="store_true", help="Log collection stages and Bulk batches to stderr"
     )
-
     collect.add_argument(
-        "--output",
-        choices=["backup_hub", "logstash", "referential", "file", "stdout"],
-        help="override the destination selected by the scope",
+        "--hours", type=float, help="Jobs/images/contents: last N hours (default: 24)"
     )
-    collect.add_argument("--dry-run", action="store_true", help="collect and parse without sending")
-    collect.add_argument(
-        "--progress",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="show progress (enabled automatically in an interactive terminal)",
-    )
-    collect.add_argument("--verbose", action="store_true", help="enable debug logs")
+    collect.add_argument("--start-date", type=parse_datetime)
+    collect.add_argument("--end-date", type=parse_datetime)
     return parser
 
 
-def context_from_args(args: argparse.Namespace) -> CollectionContext:
-    return CollectionContext(
-        source=args.source,
-        scope=args.scope,
-        asset=args.asset,
-        start_time=args.start_time,
-        end_time=args.end_time,
-        hours=args.hours,
-        days=args.days,
-        policy_types=tuple(args.policy_type),
-        policy_names=tuple(args.policy_name),
-        output=args.output,
-        dry_run=args.dry_run,
-    )
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    args = create_parser().parse_args(argv)
-    settings = Settings.from_env()
-    configure_logging(verbose=args.verbose, log_level=settings.log_level)
-    context = context_from_args(args)
-    pretty = args.progress if args.progress is not None else sys.stdout.isatty()
+def main(argv=None):
+    args = None
     try:
+        args = create_parser().parse_args(argv)
+        logging.basicConfig(stream=sys.stderr, format="%(levelname)s %(message)s")
         result = execute(
-            context,
-            settings=settings,
-            show_progress=pretty,
+            CollectionContext(**{k: v for k, v in vars(args).items() if k != "command"})
         )
-    except BackupCollectorError as exc:
-        return handle_error(context, exc)
-    except Exception as exc:  # defensive boundary for Icinga
-        return handle_error(context, exc, unexpected=True)
-    return handle_success(result, pretty=pretty)
+    except ValueError as exc:
+        result = CollectionReport()
+        result.add_error("cli", "invalid_arguments")
+        print(str(exc), file=sys.stderr)
+    print(
+        json.dumps(result.to_dict(), ensure_ascii=False),
+        file=sys.stderr if args and args.dry_run else sys.stdout,
+    )
+    return result.exit_code
 
 
 if __name__ == "__main__":

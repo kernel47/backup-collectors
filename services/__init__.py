@@ -1,2 +1,1 @@
-"""Delivery and monitoring services."""
-
+"""Shared normalization, transport and external service integrations."""

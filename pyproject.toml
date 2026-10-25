@@ -4,32 +4,28 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "backup-collector"
-version = "0.1.0"
-description = "Simple backup asset collection pipelines for Icinga"
+version = "0.2.0"
+description = "One-shot NetBackup collector for Tasker and OpenSearch"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "httpx>=0.27",
-  "netbackup-py>=0.1.0",
-  "paramiko>=3.4",
+  "netbackup-py @ git+ssh://git@github.com/kernel47/netbackup-py.git@7296f36862ad25ea2977fff7717b7d95d92757bd",
+  "opensearch-py>=2.8,<3",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.2", "ruff>=0.5"]
+dev = ["ruff>=0.5"]
 
 [project.scripts]
 backup-collector = "cli:main"
 
 [tool.setuptools]
-py-modules = ["cli", "exceptions", "models", "runtime"]
+py-modules = ["cli"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["collectors*", "services*"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]
+include = ["core*", "collectors*", "services*"]
 
 [tool.ruff]
 line-length = 100

@@ -29,7 +29,7 @@ backup-collector collect --scope netbackup --type jobs --asset master-01 --dry-r
 backup-collector collect --scope netbackup --type policies --asset master-01 --dry-run > /tmp/policies.jsonl
 ```
 
-Dry-run fait une vraie collecte : il nécessite Reference et NetBackup. Il affiche un
+Dry-run fait une vraie collecte : il nécessite Referencial et NetBackup. Il affiche un
 JSON par document sur stdout, sans créer de client OpenSearch ; diagnostics et rapport
 final vont sur stderr. En mode normal, stdout contient uniquement le rapport Tasker.
 Aucun paramètre de fixture, input-file, output-file ou ancien alias CLI n'est accepté.
@@ -57,7 +57,7 @@ collectors/
 └── tapelibrary/             # réservé
 services/
 ├── opensearch.py            # transport Bulk, limites et reprises
-├── referential.py           # client Reference existant
+├── referencial.py           # client Referencial existant
 ├── documents.py             # UUID, dates de collecte, validation et hash
 └── ssh.py                   # interface en attente de votre classe SSH
 ```
@@ -129,7 +129,7 @@ Les erreurs sont limitées à vingt et les messages des exceptions externes ne s
 recopiés. Les secrets ne sont pas inclus dans le rapport.
 
 Les paramètres applicatifs utilisent asset/type/hours/start_date/end_date. asset_id et
-resource restent uniquement les clés des contrats externes Tasker/Reference. last_hours
+resource restent uniquement les clés du contrat externe Tasker. last_hours
 est uniquement le nom requis par netbackup-py à la frontière de l'adaptateur. Les champs
 métier start_time/end_time des documents OpenSearch conservent leur nom contractuel.
 
@@ -154,7 +154,7 @@ absents et conflits update restent des échecs. Une écriture non confirmée n'e
 comptée comme succès. Le compte worker n'a besoin d'aucun droit d'administration.
 
 --debug trace sur stderr les étapes, la progression, les tailles de lots et les reprises,
-sans afficher de credentials, d'options SSH ni de payloads bruts. Les traces HTTP des
+avec traceback (fichier, ligne et message) en cas d’erreur. Les traces HTTP des
 bibliothèques ne sont pas activées.
 
 ## Installation et configuration
@@ -164,38 +164,38 @@ Python 3.12+ dans un venv, sur macOS ou RHEL, sans modifier le Python système :
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[dev]'
+python -m pip install -r requirements.txt
 cp .env.example .env
-# Compléter .env avec les valeurs réelles, puis exporter :
-set -a
-source .env
-set +a
+# Compléter .env avec les valeurs réelles ; il est chargé automatiquement.
 backup-collector collect --help
-ruff check --no-cache .
 ```
 
 En production, installer avec pip install . depuis une révision validée et faire lancer
 par Tasker l'exécutable absolu du venv. Pour mettre à jour, préparer un nouveau venv,
 contrôler par dry-run puis basculer le chemin worker en conservant le précédent.
-.env n'est pas chargé automatiquement et n'est pas versionné. Les dépendances sont
+Le fichier .env du répertoire courant est chargé automatiquement ; les variables déjà
+exportées restent prioritaires. Il n'est pas versionné. Les dépendances sont
 centralisées dans pyproject.toml ; netbackup-py est figé au commit
 7296f36862ad25ea2977fff7717b7d95d92757bd. L'installation nécessite l'accès SSH GitHub ou
 un packaging interne fournissant cette révision et adaptant sa référence VCS. Un miroir
 Bitbucket du seul collecteur ne suffit pas pour cette dépendance.
 
-Le client Reference existant est conservé. BACKUP_REFERENCE_URL contient l'URL réelle
-avec {asset_id} ou {hostname}, sinon la clé est ajoutée au chemin comme auparavant.
-REFERENTIAL_ASSET_URL et REFERENTIAL_TOKEN restent des alias d'environnement compatibles.
-La réponse doit fournir hostname, master_server, region et technology=netbackup ;
-master_server n'est jamais déduit du hostname. Voir .env.example et docs/compatibility.md.
+Le client Referencial existant est conservé. BACKUP_REFERENCIAL_ASSE_URL contient l'URL de recherche d’un asset
+avec {hostname}, sinon la clé est ajoutée au chemin comme auparavant.
+La réponse doit fournir hostname, region et technology=netbackup. --asset prend le
+hostname ; celui-ci alimente aussi master_server dans les documents et rapports. Voir .env.example et docs/compatibility.md.
 
 TLS est vérifié par défaut. OPENSEARCH_CA_CERT fournit un bundle PEM OpenSearch.
 NETBACKUP_CA_CERT passe par SSL_CERT_FILE pendant la construction du client puis restaure
-l'environnement. SSL_CERT_FILE peut aussi configurer Reference. Aucune erreur TLS ne
+l'environnement. SSL_CERT_FILE peut aussi configurer Referencial. Aucune erreur TLS ne
 désactive automatiquement les vérifications.
 
+Le modèle Asset conserve uniquement hostname, admin_name, active, region, technology,
+datacenter, api_username, api_password, domain_name, domain_type, version,
+ssh_username, ssh_password, ssh, api et is_naas. Un asset inactif est refusé.
+
 Le client SSH est construit via services.ssh.SSHClient(host, username, password, port,
-options), depuis les informations Reference. La classe actuelle expose execute(command), get_policy_clients(policy_name)
+options), avec le hostname et les identifiants Referencial (port 22 et options par défaut). La classe actuelle expose execute(command), get_policy_clients(policy_name)
 et close(), sans transport actif. Elle attend votre implémentation ; Paramiko n'est pas
 une dépendance provisoire.
 
@@ -282,7 +282,7 @@ Hors debug, performance est absent. Le bilan est disponible aussi après un éch
 Cette séquence est exécutée policy par policy, avec la même connexion SSH. Le contrat
 local get_policy_clients est une liste de noms de clients (list[str]) ; une liste vide
 est valide, mais None, un échec ou une sortie non parsée ne remplace pas les clients
-par une liste vide. SSH doit être activé dans l'asset Reference. Votre classe doit
+par une liste vide. SSH doit être activé dans l'asset Referencial. Votre classe doit
 remplacer l'emplacement get_policy_clients dans services/ssh.py ; aucune commande ou
 syntaxe de sortie n'est inventée ici. Un échec arrête la source et le dernier lot de
 policies déjà complètes est envoyé ; le rapport est partial s'il y a des écritures

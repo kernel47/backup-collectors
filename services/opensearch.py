@@ -132,18 +132,21 @@ class BulkWriter:
                         retry.append((action, body))
                     else:
                         error = result.get("error", {})
+                        LOGGER.debug("Bulk failure status=%s details=%s", status, error)
                         self.fail(
                             error.get("type", f"bulk_http_{status}")
                             if isinstance(error, dict)
                             else f"bulk_http_{status}"
                         )
             except (ConnectionError, ConnectionTimeout):
+                LOGGER.debug("Bulk connection failure", exc_info=True)
                 if attempt < self.settings.opensearch_max_retries:
                     retry = pending
                 else:
                     for _ in pending:
                         self.fail("bulk_transport_failure_unconfirmed")
             except TransportError as exc:
+                LOGGER.debug("Bulk transport failure", exc_info=True)
                 if (
                     exc.status_code in RETRY_STATUSES
                     and attempt < self.settings.opensearch_max_retries

@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import sys
+import traceback
 from datetime import datetime
 
 from core.models import CollectionContext, CollectionReport
@@ -42,7 +43,7 @@ def create_parser():
         "--dry-run", action="store_true", help="Print documents without OpenSearch writes"
     )
     collect.add_argument(
-        "--debug", action="store_true", help="Log collection stages and Bulk batches to stderr"
+        "--debug", action="store_true", help="Log stages, Bulk batches and error tracebacks to stderr"
     )
     collect.add_argument(
         "--hours", type=float, help="Jobs/images/contents: last N hours (default: 24)"
@@ -64,6 +65,8 @@ def main(argv=None):
         result = CollectionReport()
         result.add_error("cli", "invalid_arguments")
         print(str(exc), file=sys.stderr)
+        if args and args.debug:
+            traceback.print_exc(file=sys.stderr)
     print(
         json.dumps(result.to_dict(), ensure_ascii=False),
         file=sys.stderr if args and args.dry_run else sys.stdout,

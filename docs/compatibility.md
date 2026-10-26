@@ -13,7 +13,7 @@ Remplacer la classe d'interface dans services/ssh.py par votre implémentation :
 - get_image_contents(image_id) → itérateur de chemins de répertoires (str).
 - close() libère la connexion ; execute(command) peut servir à vos méthodes internes.
 
-Activer ssh dans l'asset Reference et fournir ses informations de connexion. La
+Activer ssh dans l'asset Referencial et fournir ses informations de connexion. La
 connexion est réutilisée pour toutes les policies/images d'une collecte. Une erreur
 SSH ne doit jamais être remplacée silencieusement par une liste vide. Les contenus
 doivent être produits progressivement, sans précharger une sortie SSH massive.
@@ -57,9 +57,9 @@ Aucun import Python de ce dépôt, aucune modification de ses fichiers.
   resource sont les clés du JSON Tasker existant ; last_hours est exclusivement
   l'argument externe requis par netbackup-py.
 
-Le client Reference existant est conservé. L'URL et les enveloppes acceptées doivent
-être confirmées sur le serveur réel. master_server, region, technology et hostname
-sont requis ; master_server n'est jamais remplacé par hostname.
+Le client Referencial existant est conservé. L'URL et les enveloppes acceptées doivent
+être confirmées sur le serveur réel. hostname, region et technology sont requis. Le hostname identifie l’asset et
+alimente master_server dans les contrats OpenSearch et Tasker.
 
 ## Bibliothèque NetBackup et points à observer
 

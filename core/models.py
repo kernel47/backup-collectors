@@ -8,24 +8,21 @@ from uuid import uuid4
 @dataclass
 class Asset:
     hostname: str
-    master_server: str
-    region: str
+    admin_name: str = ""
+    active: bool = True
+    region: str = ""
     technology: str = "netbackup"
-    asset: str = ""
-    api_endpoint: str | None = None
-    connection_method: str = "rest"
+    datacenter: str = ""
     api_username: str | None = None
     api_password: str | None = field(default=None, repr=False)
-    api_token: str | None = field(default=None, repr=False)
-    domain_type: str = ""
     domain_name: str = ""
+    domain_type: str = ""
     version: str | None = None
     ssh_username: str | None = None
     ssh_password: str | None = field(default=None, repr=False)
-    ssh_port: int = 22
-    ssh_options: dict = field(default_factory=dict, repr=False)
-    api: bool = True
     ssh: bool = False
+    api: bool = True
+    is_naas: bool = False
 
 
 @dataclass
@@ -68,9 +65,10 @@ class CollectionContext:
 
 @dataclass
 class Settings:
-    backup_reference_url: str = ""
-    backup_reference_token: str = field(default="", repr=False)
-    backup_reference_timeout: float = 15.0
+    backup_referencial_url: str = ""
+    backup_referencial_asse_url: str = ""
+    backup_referencial_token: str = field(default="", repr=False)
+    backup_referencial_timeout: float = 15.0
     opensearch_url: str = ""
     opensearch_username: str = ""
     opensearch_password: str = field(default="", repr=False)
@@ -92,7 +90,7 @@ class Settings:
 
     def __post_init__(self):
         for name in (
-            "backup_reference_timeout",
+            "backup_referencial_timeout",
             "opensearch_timeout",
             "netbackup_timeout",
             "opensearch_max_batch_mb",
@@ -114,6 +112,9 @@ class Settings:
 
     @classmethod
     def from_env(cls):
+        from dotenv import load_dotenv
+
+        load_dotenv(dotenv_path=".env", override=False)
         values = {}
         for f in fields(cls):
             value = os.getenv(f.name.upper())
@@ -128,8 +129,6 @@ class Settings:
             elif isinstance(f.default, float):
                 value = float(value)
             values[f.name] = value
-        values.setdefault("backup_reference_url", os.getenv("REFERENTIAL_ASSET_URL", ""))
-        values.setdefault("backup_reference_token", os.getenv("REFERENTIAL_TOKEN", ""))
         return cls(**values)
 
 

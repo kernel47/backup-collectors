@@ -99,7 +99,7 @@ def configuration_hash(configuration):
 
 def prepare_document(kind, attributes, asset, observed_at):
     document = {key: value for key, value in clean(attributes).items() if value is not None}
-    document.update(master_server=asset.master_server, region=asset.region)
+    document.update(master_server=asset.hostname, region=asset.region)
     if kind == "jobs":
         document["job_id"] = identity_text(document.get("job_id"))
         if document["job_id"].isdecimal():

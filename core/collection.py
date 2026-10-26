@@ -11,7 +11,7 @@ from time import monotonic
 
 from core.exceptions import BackupCollectorError, ConfigurationError, ParsingError
 from core.models import CollectionContext, CollectionReport, PerformanceStats, Settings
-from services import opensearch, referential
+from services import opensearch, referencial
 from services.documents import prepare_document
 
 LOGGER = logging.getLogger(__name__)
@@ -57,13 +57,16 @@ class CollectionRun:
         return error is not None and isinstance(error, Exception)
 
     def prepare(self):
-        self.settings = self.settings or Settings.from_env()
         if self.context.debug:
             logging.basicConfig(stream=sys.stderr, format="%(levelname)s %(name)s %(message)s")
         for name in ("core", "collectors", "services"):
             logging.getLogger(name).setLevel(
-                logging.DEBUG if self.context.debug else self.settings.log_level.upper()
+                logging.DEBUG if self.context.debug else logging.INFO
             )
+        self.settings = self.settings or Settings.from_env()
+        if not self.context.debug:
+            for name in ("core", "collectors", "services"):
+                logging.getLogger(name).setLevel(self.settings.log_level.upper())
         LOGGER.debug(
             "start scope=%s type=%s hours=%s start_date=%s end_date=%s",
             self.context.scope,
@@ -74,10 +77,10 @@ class CollectionRun:
         )
 
     def resolve_asset(self):
-        self.stage = "reference"
+        self.stage = "referencial"
         LOGGER.debug("resolving asset")
-        self.asset = referential.get_asset(self.context.asset, self.settings)
-        self.report.master_server = self.asset.master_server
+        self.asset = referencial.get_asset(self.context.asset, self.settings)
+        self.report.master_server = self.asset.hostname
         self.report.region = self.asset.region
         self.report.technology = self.asset.technology
 
@@ -161,7 +164,11 @@ class CollectionRun:
             self.storage_error = True
         message = str(error) if isinstance(error, BackupCollectorError) else None
         self.report.add_error(stage, type(error).__name__, message)
-        LOGGER.debug("error stage=%s code=%s", stage, type(error).__name__)
+        if self.context.debug:
+            LOGGER.debug(
+                "error stage=%s code=%s", stage, type(error).__name__,
+                exc_info=(type(error), error, error.__traceback__),
+            )
 
 
 class DebugProfiler:

@@ -66,7 +66,7 @@ class CollectionContext:
 @dataclass
 class Settings:
     backup_referencial_url: str = ""
-    backup_referencial_asse_url: str = ""
+    backup_referencial_asset_url: str = ""
     backup_referencial_token: str = field(default="", repr=False)
     backup_referencial_timeout: float = 15.0
     opensearch_url: str = ""

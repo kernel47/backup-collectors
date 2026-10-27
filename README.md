@@ -180,7 +180,7 @@ centralisées dans pyproject.toml ; netbackup-py est figé au commit
 un packaging interne fournissant cette révision et adaptant sa référence VCS. Un miroir
 Bitbucket du seul collecteur ne suffit pas pour cette dépendance.
 
-Le client Referencial existant est conservé. BACKUP_REFERENCIAL_ASSE_URL contient l'URL de recherche d’un asset
+Le client Referencial existant est conservé. BACKUP_REFERENCIAL_ASSET_URL contient l'URL de recherche d’un asset
 avec {hostname}, sinon la clé est ajoutée au chemin comme auparavant.
 La réponse doit fournir hostname, region et technology=netbackup. --asset prend le
 hostname ; celui-ci alimente aussi master_server dans les documents et rapports. Voir .env.example et docs/compatibility.md.

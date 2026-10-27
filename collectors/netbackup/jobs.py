@@ -8,6 +8,9 @@ from collectors.netbackup.parser import parse_job
 from core.collection import CollectionRun
 from core.models import CollectionContext, CollectionReport, Settings
 
+STANDARD_FILTER = ""  # Fill with the standard jobs API filter.
+VMWARE_FILTER = ""  # Fill with the VMware jobs API filter.
+
 
 def collect_jobs(context: CollectionContext, settings: Settings | None = None) -> CollectionReport:
     run = CollectionRun(context, settings)
@@ -34,4 +37,6 @@ def iter_jobs(api_client, ssh_client=None, *, hours=None, start_date=None, end_d
     if start_date is None:
         end_date = datetime.now(UTC)
         start_date = end_date - timedelta(hours=24 if hours is None else hours)
-    yield from api_client.jobs.iter(**date_parameters(start_date=start_date, end_date=end_date))
+    period = date_parameters(start_date=start_date, end_date=end_date)
+    yield from api_client.jobs.iter(filter=STANDARD_FILTER, **period)
+    yield from api_client.jobs.iter(filter=VMWARE_FILTER, **period)

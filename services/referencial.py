@@ -11,9 +11,9 @@ from core.models import Asset, Settings
 
 def get_asset(asset: str, settings: Settings) -> Asset:
     # Preserve the existing configured URL behavior; do not invent an API route.
-    url = settings.backup_referencial_asse_url
+    url = settings.backup_referencial_asset_url
     if not url:
-        raise ConfigurationError("BACKUP_REFERENCIAL_ASSE_URL is required")
+        raise ConfigurationError("BACKUP_REFERENCIAL_ASSET_URL is required")
     encoded = quote(asset, safe="")
     if "{hostname}" in url:
         url = url.replace("{hostname}", encoded)

@@ -100,54 +100,7 @@ def configuration_hash(configuration):
 def prepare_document(kind, attributes, asset, observed_at):
     document = {key: value for key, value in clean(attributes).items() if value is not None}
     document.update(master_server=asset.hostname, region=asset.region)
-    if kind == "jobs":
-        document["job_id"] = identity_text(document.get("job_id"))
-        if document["job_id"].isdecimal():
-            document["job_id"] = str(int(document["job_id"]))
-        if not isinstance(document.get("state"), str) or not document["state"]:
-            raise ParsingError("Job state is required")
-    for key in ("start_time", "end_time", "backup_time", "expiration_time"):
-        if key in document:
-            document[key] = timestamp(document[key])
-    for key in ("job_id", "parent_job_id", "status", "retention_level"):
-        if key in document:
-            document[key] = str(document[key])
-    for key in ("elapsed_seconds", "kilobytes", "files", "percent_complete", "copy_number"):
-        if key in document and (
-            isinstance(document[key], bool) or not isinstance(document[key], int)
-        ):
-            raise ParsingError(f"{key} must be an integer")
-    for key in ("active", "storage_is_slp"):
-        if key in document and not isinstance(document[key], bool):
-            raise ParsingError(f"{key} must be boolean")
-    for key in (
-        "name",
-        "image_id",
-        "path",
-        "client",
-        "policy",
-        "policy_type",
-        "type",
-        "state",
-        "schedule",
-        "schedule_type",
-        "storage_unit",
-        "backup_id",
-        "storage",
-        "slp",
-        "target_storage",
-        "storage_location",
-    ):
-        if key in document and not isinstance(document[key], str):
-            raise ParsingError(f"{key} must be a string")
-    if "clients" in document and (
-        not isinstance(document["clients"], list)
-        or any(not isinstance(name, str) or not name.strip() for name in document["clients"])
-    ):
-        raise ParsingError("clients must be a list of nonempty names")
     if kind == "images-contents":
-        if "backup_time" not in document:
-            raise ParsingError("Image contents backup_time is required")
         document["created_at"] = timestamp(observed_at)
     else:
         document.update(

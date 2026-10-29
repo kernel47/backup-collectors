@@ -20,9 +20,10 @@ doivent être produits progressivement, sans précharger une sortie SSH massive.
 
 ## Comportement courant des ressources
 
-- Jobs : un seul appel de service paginé, fenêtre fixée au départ ; 24 h par défaut.
-  Le scénario à deux appels standard/VMware n'est pas activé, faute de paramètre
-  confirmé dans la révision installée. Le dernier échange a conservé l'appel unique.
+- Jobs : `iter_started_jobs()` par `startTime` puis `iter_finished_jobs()` par
+  `endTime`, chacun avec un parcours hors VMware et un parcours VMware. Même fenêtre fixée au départ, bornes incluses, sans filtre OR.
+  Le parcours de fin ignore les jobs déjà couverts par leur date de début.
+  `--hours 1` pour la dernière heure ; 24 h par défaut.
 - Images : API paginée sur la période, 24 h par défaut ; aucune récupération de
   contenu SSH dans cette collecte.
 - Policies : résumés API → exclusions dans le code → détail API → clients SSH →

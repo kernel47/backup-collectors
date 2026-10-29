@@ -1,11 +1,15 @@
 """images-contents: source-specific collection with a small explicit execution sequence."""
 
+import logging
+
 from collectors.netbackup import client
 from collectors.netbackup.client import date_parameters
 from collectors.netbackup.parser import parse_image_content
 from core.collection import CollectionRun
 from core.exceptions import ConfigurationError, ParsingError
 from core.models import CollectionContext, CollectionReport, Settings
+
+LOGGER = logging.getLogger(__name__)
 
 
 def collect_images_contents(
@@ -15,6 +19,10 @@ def collect_images_contents(
     with run:
         run.prepare()
         run.resolve_asset()
+        if not run.asset.is_naas:
+            run.report.skip("asset_not_naas")
+            LOGGER.debug("skipped asset=%s reason=asset_not_naas", run.asset.hostname)
+            return run.report
         run.open_clients(client)
         run.open_output()
         for record in iter_images_contents(

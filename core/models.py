@@ -183,6 +183,7 @@ class CollectionReport:
     schema_version: str = "1.0"
     collection_id: str = field(default_factory=lambda: str(uuid4()))
     status: str = "failed"
+    reason: str | None = None
     asset_id: str | None = None
     master_server: str | None = None
     region: str | None = None
@@ -213,7 +214,14 @@ class CollectionReport:
                 error["message"] = message
             self.errors.append(error)
 
+    def skip(self, reason):
+        self.status = self.collection.status = self.storage.status = "skipped"
+        self.reason = reason
+
     def finish(self, completed, duration):
+        self.duration_seconds = round(duration, 3)
+        if self.status == "skipped" and not self.errors and not self.storage.failed:
+            return
         valid = self.collection.collected - self.collection.invalid
         self.collection.status = (
             "success"
@@ -234,14 +242,15 @@ class CollectionReport:
             self.status = "success"
         else:
             self.status = "partial" if self.storage.confirmed else "failed"
-        self.duration_seconds = round(duration, 3)
 
     @property
     def exit_code(self):
-        return {"success": 0, "failed": 1, "partial": 2}[self.status]
+        return {"success": 0, "skipped": 0, "failed": 1, "partial": 2}[self.status]
 
     def to_dict(self):
         result = asdict(self)
+        if self.reason is None:
+            result.pop("reason")
         if self.performance is None:
             result.pop("performance")
         if self.storage.destination != "console":
